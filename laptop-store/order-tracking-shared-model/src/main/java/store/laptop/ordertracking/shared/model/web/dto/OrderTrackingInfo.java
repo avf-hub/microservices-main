@@ -8,6 +8,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import store.laptop.ordering.shared.model.web.dto.OrderStatus;
 import store.laptop.payment.shared.model.web.dto.PaymentStatus;
+import store.laptop.shipping.shared.model.web.dto.ShippingStatus;
 
 @Getter
 @NoArgsConstructor
@@ -16,8 +17,5 @@ import store.laptop.payment.shared.model.web.dto.PaymentStatus;
 public class OrderTrackingInfo {
 	OrderStatus orderStatus;
 	PaymentStatus paymentStatus;
-
-	public String getShippingStatus() {
-		return "UNKNOWN";
-	}
+	ShippingStatus shippingStatus;
 }

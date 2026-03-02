@@ -5,4 +5,5 @@ plugins {
 dependencies {
     api project(':laptop-store-ordering-shared-model')
     api project(':laptop-store-payment-shared-model')
+    api project(':laptop-store-shipping-shared-model')
 }
