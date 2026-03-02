@@ -1,0 +1,12 @@
+spring:
+  application:
+    name: Processor
+  cloud:
+    stream:
+      bindings:
+        toUpperCase-in-0:
+          destination: wordStream
+        toUpperCase-out-0:
+          destination: wordStreamResults
+server:
+  port: 0

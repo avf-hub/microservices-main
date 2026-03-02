@@ -1,0 +1,49 @@
+// Сценарий отмены доставки заказа: реализация с использованием шаблона Saga
+
+### saga.1: place order
+POST http://{{ordering-host}}:{{ordering-port}}/orders
+Content-Type: application/json
+
+{
+  "customerId": 1,
+  "items": [
+    {
+      "productId": 1,
+      "cost": 2000,
+      "qty": 1
+    },
+    {
+      "productId": 2,
+      "cost": 1500,
+      "qty": 2
+    }
+  ]
+}
+
+> {%
+    client.global.set('order-id', response.body.id);
+%}
+
+### saga.2 request verification
+PUT http://{{ordering-host}}:{{ordering-port}}/orders/{{order-id}}/verification
+
+### saga.3 pay for order
+POST http://{{payment-host}}:{{payment-port}}/payments/byOrder/{{order-id}}
+
+### saga.4. Check the status after the payment - will change in 30s
+GET http://{{payment-host}}:{{payment-port}}/payments/byOrder/{{order-id}}/status
+
+# wait until Payment will be processed (30s)
+# the shipping will be started automatically
+
+### saga.5 get tracking status
+GET http://{{order-tracking-host}}:{{order-tracking-port}}/{{order-id}}
+
+# you can cancel the shipping - in this case payment should be refunded automatically
+# impelent the code described in TASK3 to handle the refund
+
+### saga.6 cancel shipping
+DELETE http://{{shipping-host}}:{{shipping-port}}/shipping/{{order-id}}
+
+# you will see the refund in the PaymentService logs
+

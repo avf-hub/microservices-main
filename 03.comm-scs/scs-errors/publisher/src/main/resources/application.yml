@@ -1,0 +1,7 @@
+spring:
+  application:
+    name: Publisher
+
+server:
+  port: 8031
+

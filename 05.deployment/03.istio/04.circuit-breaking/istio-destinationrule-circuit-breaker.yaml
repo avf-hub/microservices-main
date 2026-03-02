@@ -1,0 +1,34 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: mouse-reviews
+spec:
+  host: mouse-reviews
+  subsets:
+    - name: v1
+      labels:
+        app: mouse-reviews
+        version: v1
+  trafficPolicy:
+    # If service returns 5xx 2 times during less than 10s, it will be ejected for 30s or more
+    outlierDetection:
+      # The number of consecutive 5xx errors before a host is ejected from the load balancing pool.
+      consecutive5xxErrors: 2
+      # Time interval between ejection sweep analysis.
+      interval: 10s
+      # Minimum time a host is ejected for
+      baseEjectionTime: 30s
+      # The maximum percentage of hosts that can be ejected at the same time.
+      maxEjectionPercent: 100
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: mouse-catalog
+spec:
+  host: mouse-catalog
+  subsets:
+    - name: v1
+      labels:
+        app: mouse-catalog
+        version: v1

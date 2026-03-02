@@ -1,0 +1,8 @@
+plugins {
+    id 'training.laptop-store-shared-model'
+}
+
+dependencies {
+    api project(':laptop-store-ordering-shared-model')
+    api project(':laptop-store-payment-shared-model')
+}

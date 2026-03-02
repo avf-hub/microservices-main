@@ -1,0 +1,5 @@
+### Using version 1 of the API
+GET http://localhost:8081/byMouse/1
+
+### Using version 2 of the API
+GET http://localhost:8081/v2/mice/1

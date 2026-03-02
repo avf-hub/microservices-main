@@ -1,0 +1,97 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: book-service
+  labels:
+    app: book-service
+    version: v1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: book-service
+      version: v1
+  template:
+    metadata:
+      name: book-service
+      labels:
+        app: book-service
+        version: v1
+    spec:
+      containers:
+        - name: book-service
+          image: bookservice:v1
+          env:
+            - name: JAVA_OPTIONS
+              value: -Xms15m -Xmx15m -Xmn15m
+            - name: SPRING_PROFILES_ACTIVE
+              value: v2
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          imagePullPolicy: Never
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: book-service
+  labels:
+    app: book-service
+spec:
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+  type: ClusterIP
+  selector:
+    app: book-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: book-reviews
+  labels:
+    app: book-reviews
+    version: v1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: book-reviews
+      version: v1
+  template:
+    metadata:
+      name: book-reviews
+      labels:
+        app: book-reviews
+        version: v1
+    spec:
+      containers:
+        - name: book-reviews
+          image: bookreviews:v1
+          env:
+            - name: JAVA_OPTIONS
+              value: -Xms15m -Xmx15m -Xmn15m
+            - name: SPRING_PROFILES_ACTIVE
+              value: v2
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          imagePullPolicy: Never
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: book-reviews
+  labels:
+    app: book-reviews
+spec:
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+  type: LoadBalancer
+  selector:
+    app: book-reviews

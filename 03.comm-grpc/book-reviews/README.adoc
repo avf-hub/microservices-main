@@ -1,0 +1,90 @@
+== gRPC
+
+This example is composed of 2 submodules:
+
+* BookReviews - a REST API facade for your small book system.
+
+* BookService - book catalog backend
+
+`BookReviews` is contacting `BookService` over `gRPC`.
+
+BookReviews exposes 2 endpoints:
+
+[source,httprequest]
+.fetch some fake reviews about a single book using blocking gRPC client
+----
+GET http://localhost:8080/reviews/byBook/1
+----
+
+Check out `training.grpcdemo.rest.BookReviewsController`
+
+
+[source,httprequest]
+.list reviews - uses async gRPC client
+----
+GET http://localhost:8080/reviews
+----
+
+Check out `training.grpcdemo.rest.BookReviewsAsyncController`.
+
+== gRPC CLI
+
+=== to install grpc_cli on Mac:
+[source,bash]
+----
+brew install grpc
+----
+
+=== to install grpc_cli on Windows:
+
+1) Download the latest release from https://github.com/grpc/grpc/releases
+
+2) Unzip the downloaded file to a directory (e.g., C:\grpc_tools).
+
+3) Add the directory to the PATH environment variable.
+
+== Using grpc_cli
+
+1) Get the list of services
+
+[source,bash]
+----
+grpc_cli ls localhost:6565
+----
+
+2) Get the list of methods for a service
+
+[source,bash]
+----
+grpc_cli ls localhost:6565 com.bookstore.BookService
+----
+
+3) Get the list of methods for a service with details
+
+[source,bash]
+----
+grpc_cli ls localhost:6565 com.bookstore.BookService -l
+----
+
+4) Get the type of a request
+
+[source,bash]
+----
+grpc_cli type localhost:6565 com.bookstore.BookByIdRequest
+----
+
+5) Get the type of a response
+
+[source,bash]
+----
+grpc_cli type localhost:6565 com.bookstore.BookResponse
+----
+
+6) Call a remote method
+
+[source,bash]
+----
+grpc_cli call localhost:6565 com.bookstore.BookService/findById "id: 412"
+----
+
+

@@ -1,0 +1,7 @@
+### Get notebook with id 1
+
+GET http://{{catalog-host}}:{{catalog-port}}/catalog/1
+
+### Get all notebooks
+
+GET http://{{catalog-host}}:{{catalog-port}}/catalog

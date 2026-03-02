@@ -1,0 +1,39 @@
+= Circuit breaking
+
+Our mouse-reviews service randomly (50% of cases) throws an exception.
+
+You can configure the level of possible errors setting `APP_SIMULATED_ERROR_POSSIBILITY_PERCENT` in
+`deployment-mouse-reviews.yaml`
+
+By applying circuit breaker, we will stop querying mouse-reviews after configured errors count
+and will use mocked data.
+
+Pay attention to header `x-mousestore-reviews-response-time` - it shows how much time it took to access mouse-reviews service. If this time is short (<10ms) - it means that circuit breaker is in the opened state and no attempts performed to access it.
+
+[source,shell]
+.deploy app resources
+----
+kubectl apply -f .
+----
+
+Issue following request multiple times and observe the result.
+After some number of requests circuit breaker will trip and you will notice:
+
+* no reviews collection being returned.
+* additional header `x-mousestore-info: Reviews not available` added by server to understand
+this situation better.
+
+Wait for some time and try again, if you are lucky - circuit breaker will close thus providing
+a proper response from mouse-reviews. Adjust error rate if default 50% is too big.
+
+[source,shell]
+.send request to mouse-catalog.
+----
+curl -v http://localhost/mice/1
+----
+
+[source,shell]
+.do not forget to clean up before trying out other examples
+----
+kubectl delete -f .
+----

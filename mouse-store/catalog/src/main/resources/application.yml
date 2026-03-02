@@ -1,0 +1,12 @@
+spring:
+  application:
+    name: mouse-catalog
+  jackson:
+    default-property-inclusion: non_null
+  cloud:
+    discovery:
+      client:
+        simple:
+          instances:
+            reviews:
+              - uri: http://localhost:8081

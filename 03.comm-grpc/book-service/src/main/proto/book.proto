@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package com.bookstore;
+option java_package = "training.grpc.book";
+
+enum BookSort {
+  TITLE = 0;
+  AUTHOR = 1;
+}
+
+message Book {
+  int64 id = 1;
+  string title = 2;
+  string author = 3;
+}
+
+message BookByIdRequest {
+  int64 id = 1;
+}
+
+message BookStreamRequest {
+  int64 count = 1;
+  BookSort sort = 2;
+}
+
+message BookResponse {
+  Book book = 1;
+}
+
+service BookService {
+  rpc findById(BookByIdRequest) returns (BookResponse) {};
+  rpc getBooks(BookStreamRequest) returns (stream BookResponse) {};
+}

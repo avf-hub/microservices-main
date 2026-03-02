@@ -1,0 +1,8 @@
+plugins {
+    id 'training.spring-cloud-stream-app'
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    runtimeOnly 'com.h2database:h2'
+}

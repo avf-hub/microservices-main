@@ -1,0 +1,10 @@
+plugins {
+    id 'training.boot-app'
+}
+
+group = 'training.jva083.data'
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-json'
+    implementation 'org.springframework.kafka:spring-kafka'
+}

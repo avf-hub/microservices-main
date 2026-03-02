@@ -1,0 +1,64 @@
+= Basic Istio routing
+
+In this example we create an API Gateway for our bookstore.
+
+We define a VirtualService to route traffic to `mouse-catalog` and `mouse-reviews`
+based on queried endpoint.
+
+* `/mice/*` -> mouse-catalog
+* `/reviews/*` -> mouse-reviews
+
+[source,shell]
+.deploy app resources
+----
+kubectl apply -f .
+----
+
+[CAUTION]
+====
+* Make sure your `minikube tunnel` is running!
+* Make sure you deployed app images to minikube docker registry.
+* Usually the Istio Ingress Gateway URL is `http://localhost:80`
+====
+
+[source,shell]
+.send request to mouse-catalog
+----
+curl -s http://localhost/mice/1 | jq -C .
+----
+
+[source,shell]
+.send request to mouse-reviews
+----
+curl -s http://localhost/reviews/1 | jq -C .
+----
+
+[source,shell]
+.run multiple requests
+----
+watch -n 1 "curl -s http://localhost/mice/1 | jq ."
+----
+
+[source,shell]
+.inspect the traffic using Kiali Dashboard
+----
+istioctl dashboard kiali
+----
+
+* Open `Graph` tab on the left side
+* Choose `default` namespace
+* Open 'display' dropdown and tick 'Response Time' 'Traffic Distribution' 'Traffic Animation' (Other options can be
+ticked as well)
+* Set time in the up right corner (e.g. 5m) and refresh
+
+[source,shell]
+.use Jaeger - distributed tracing system
+----
+istioctl dashboard jaeger
+----
+
+[source,shell]
+.do not forget to clean up before trying out other examples
+----
+kubectl delete -f .
+----

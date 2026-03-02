@@ -1,0 +1,153 @@
+= Task 1. Implementing order-tracking-service -> shipping-service communication with OpenFeign client
+
+== Introduction
+
+Our order tracking service implements a REST endpoint that allows up to query current order state.
+Currently, the DTO returned by the service is a little bit incomplete:
+
+[source,java]
+----
+@Getter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class OrderTrackingInfo {
+	OrderStatus orderStatus;
+	PaymentStatus paymentStatus;
+
+	public String getShippingStatus() {
+		return "UNKNOWN";
+	}
+}
+----
+
+We need to implement a proper integration of order-tracking-service and shipping service and return real shipping status
+to the user.
+
+== Dependencies
+
+Add `shipping-shared-model` dependency to `order-tracking-shared-model`. This dependency will be also transitively visible
+in `order-tracking-service`
+
+[source,groovy]
+.laptop-store/order-tracking-shared-model/build.gradle
+----
+dependencies {
+    api project(':laptop-store-ordering-shared-model')
+    api project(':laptop-store-payment-shared-model')
+    api project(':laptop-store-shipping-shared-model') // +++
+}
+----
+
+Reload Gradle project using built in Gradle functionality so the dependencies are visible by IntelliJ IDEA.
+
+== Create Feign client for shipping service
+
+Open `store.laptop.ordertracking.client` package in `order-tracking-service` project. This packge already contains `OrderServiceClient` and `PaymentServiceClient` so you can use those as "copy/paste" reference.
+
+Declare your new Feign client:
+
+[source,java]
+----
+@FeignClient(name = "shipping",
+	url = "#{serviceCommonConfig['shipping-service'].url}/shipping")
+public interface ShippingServiceClient extends ShippingAPI { // <1>
+
+}
+----
+<1> If you cannot resolve ShippingAPI reference - refresh your Gradle dependencies.
+
+== Modify OrderTrackingInfo DTO
+
+[source,java]
+.OrderTrackingInfo.java
+----
+@Getter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class OrderTrackingInfo {
+	OrderStatus orderStatus;
+	PaymentStatus paymentStatus;
+	ShippingStatus shippingStatus; // <1>
+
+    // remove placeholder method:
+	// public String getShippingStatus() {
+	//	return "UNKNOWN";
+	//}
+}
+----
+<1> Use real status instead of just placeholder "UKNNOWN" value.
+
+== Add integration code to OrderTrackingController
+
+Add reference to `ShippingServiceClient` to `OrderTrackingControllerConstructor`
+
+[source,java]
+.OrderTrackingController.java
+----
+public OrderTrackingController(OrderingServiceClient orderingServiceClient,
+                               PaymentServiceClient paymentServiceClient,
+                               ShippingServiceClient shippingServiceClient) {
+    this.orderingServiceClient = orderingServiceClient;
+    this.paymentServiceClient = paymentServiceClient;
+    this.shippingServiceClient = shippingServiceClient;
+}
+----
+
+Use new client to properly fill all fields on `OrderTrackingInfo` instance
+
+[source,java]
+.OrderTrackingController.java
+----
+public OrderTrackingInfo getOrderStatus(Long orderId) {
+    try {
+        OrderInfo orderInfo = orderingServiceClient.getOrderStatus(orderId);
+
+        PaymentStatus paymentStatus = null;
+        if (orderInfo.getStatus() == OrderStatus.CONFIRMED ||
+            orderInfo.getStatus() == OrderStatus.CANCELED
+        ) {
+            paymentStatus = paymentServiceClient.getStatusByOrder(orderId);
+        }
+
+        ShippingStatus shippingStatus =                     // +++
+          shippingServiceClient.getShippingStatus(orderId); // +++
+
+        return OrderTrackingInfo.builder()
+            .orderStatus(orderInfo.getStatus())
+            .paymentStatus(paymentStatus)
+            .shippingStatus(shippingStatus) // +++
+            .build();
+
+    } catch (Exception e) {
+        throw new OrderTrackingException("Error in tracking order",
+            orderId, e);
+    }
+}
+----
+
+The implementation is complete.
+
+== Testing
+
+Rest queries stored in `laptop-store/_http/rest.http` allow you to test out various scenarios for order processing.
+
+You need to execute following steps:
+
+* Create and order
+* Verify it
+* Check order tracking status - Shipping should have state `UNKNOWN`
+* Initiate shipping.
+* Check order tracking status - Shipping should have state 'IN_DELIVERY'
+* After 1 minute the status should change to 'DELIVERED' automatically.
+
+== Advanced task for self work: implement verification
+
+Order should be verified in Ordering Service.
+
+Currently, verification is only changing the state of the Order, the real verification is not implemented.
+
+Implement a proper verification process in Ordering Service. For this, you need to connect to the Inventory Service and make a reservation. If the reservation is successful, update the Order state to `CONFIRMED`.
+
+Otherwise, if items are not available, update the status to `REJECTED` (introduce this OrderState).

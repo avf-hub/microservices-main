@@ -1,0 +1,90 @@
+// Основной сценарий покупки ноутбуков
+
+### catalog.1: find laptops by criteria
+// Some parameter values can be case sensitive.
+// To make a request without criteria just comment parameters below.
+GET http://{{catalog-host}}:{{catalog-port}}/catalog
+    ?manufacturer=Apple
+    &ramCapacity=8
+    &storageType=ssd
+
+### catalog.2: find one laptop by id
+GET {{catalog-host}}:{{catalog-port}}/catalog/1
+
+### inventory.1: get product availability
+GET http://{{inventory-host}}:{{inventory-port}}/inventory/byProduct/1
+
+### inventory.2: reserve stock
+POST http://{{inventory-host}}:{{inventory-port}}/inventory
+Content-Type: application/json
+
+{
+  "inventoryItemId": 1,
+  "requiredQty": 1
+}
+
+### order.1: place order
+POST http://{{ordering-host}}:{{ordering-port}}/orders
+Content-Type: application/json
+
+{
+  "customerId": 1,
+  "items": [
+    {
+      "productId": 1,
+      "cost": 3500,
+      "qty": 1
+    },
+    {
+      "productId": 2,
+      "cost": 2700,
+      "qty": 1
+    }
+  ]
+}
+
+> {%
+    client.global.set('order-id', response.body.id);
+%}
+
+### order.2: fetch order status
+GET http://{{ordering-host}}:{{ordering-port}}/orders/{{order-id}}/status
+
+### order.3 request verification
+PUT http://{{ordering-host}}:{{ordering-port}}/orders/{{order-id}}/verification
+
+### order.4 get tracking status
+GET http://{{order-tracking-host}}:{{order-tracking-port}}/{{order-id}}
+
+### order.5 pay for order
+POST http://{{payment-host}}:{{payment-port}}/payments/byOrder/{{order-id}}
+
+### order.6. Check the status after the payment - it will change in 30s
+GET http://{{payment-host}}:{{payment-port}}/payments/byOrder/{{order-id}}/status
+
+### order.7 get tracking status
+GET http://{{order-tracking-host}}:{{order-tracking-port}}/{{order-id}}
+
+### order.8 get shipping status
+GET http://{{shipping-host}}:{{shipping-port}}/shipping/{{order-id}}/status
+
+### order.9 start delivery
+PUT http://{{shipping-host}}:{{shipping-port}}/shipping/{{order-id}}
+
+### order.10 get shipping status (after delivery start, after 60s)
+GET http://{{shipping-host}}:{{shipping-port}}/shipping/{{order-id}}/status
+
+
+###############################################################################
+# Additional scenarios
+###############################################################################
+
+### retrieve invoice (invoicen is created automatically)
+# to automatically create invoice,
+# run Kafka and turn on message publishing in ordering-service
+# by setting app.disable-message-publishing: false in application.yml
+### invoice.1: fetch invoice
+GET http://{{invoicing-host}}:{{invoicing-port}}/invoices/byOrder/{{order-id}}
+
+### cancel shipping: this is implemented in task 3 (Saga pattern) - see saga.http
+DELETE http://{{shipping-host}}:{{shipping-port}}/shipping/{{order-id}}

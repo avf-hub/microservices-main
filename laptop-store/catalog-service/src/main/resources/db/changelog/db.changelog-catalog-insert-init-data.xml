@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.1.xsd">
+
+    <changeSet id="insert-laptops-init-data" author="alex-v-yakunin" context="catalog">
+        <preConditions onFail="WARN">
+            <tableIsEmpty tableName="laptops"/>
+        </preConditions>
+        <insert tableName="laptops">
+            <column name="manufacturer" value="Apple"/>
+            <column name="model" value="MacBook Pro"/>
+            <column name="screen_size" value="13"/>
+            <column name="screen_resolution" value="2560x1600"/>
+            <column name="processor_line" value="M1"/>
+            <column name="processor_core_count" value="8"/>
+            <column name="ram_capacity" value="8"/>
+            <column name="storage_type" value="SSD"/>
+            <column name="drive_capacity" value="256"/>
+            <column name="os" value="macOS"/>
+        </insert>
+        <insert tableName="laptops">
+            <column name="manufacturer" value="Apple"/>
+            <column name="model" value="MacBook Pro"/>
+            <column name="screen_size" value="16"/>
+            <column name="screen_resolution" value="3072x1920"/>
+            <column name="processor_line" value="Intel Core i7"/>
+            <column name="processor_core_count" value="8"/>
+            <column name="ram_capacity" value="16"/>
+            <column name="storage_type" value="SSD"/>
+            <column name="drive_capacity" value="512"/>
+            <column name="os" value="macOS"/>
+        </insert>
+        <insert tableName="laptops">
+            <column name="manufacturer" value="HP"/>
+            <column name="model" value="ProBook"/>
+            <column name="screen_size" value="13"/>
+            <column name="screen_resolution" value="1920x1080"/>
+            <column name="processor_line" value="Intel Core i3"/>
+            <column name="processor_core_count" value="2"/>
+            <column name="ram_capacity" value="8"/>
+            <column name="storage_type" value="SSD"/>
+            <column name="drive_capacity" value="256"/>
+            <column name="os" value="Windows 10 Pro"/>
+        </insert>
+        <insert tableName="laptops">
+            <column name="manufacturer" value="Dell"/>
+            <column name="model" value="Latitude"/>
+            <column name="screen_size" value="15"/>
+            <column name="screen_resolution" value="1920x1080"/>
+            <column name="processor_line" value="Intel Core i5"/>
+            <column name="processor_core_count" value="4"/>
+            <column name="ram_capacity" value="8"/>
+            <column name="storage_type" value="SSD"/>
+            <column name="drive_capacity" value="256"/>
+            <column name="os" value="Windows 10 Pro"/>
+        </insert>
+        <insert tableName="laptops">
+            <column name="manufacturer" value="Lenovo"/>
+            <column name="model" value="ThinkPad"/>
+            <column name="screen_size" value="15"/>
+            <column name="screen_resolution" value="1920x1080"/>
+            <column name="processor_line" value="Intel Core i5"/>
+            <column name="processor_core_count" value="4"/>
+            <column name="ram_capacity" value="8"/>
+            <column name="storage_type" value="SSD"/>
+            <column name="drive_capacity" value="512"/>
+            <column name="os"/>
+        </insert>
+        <insert tableName="laptops">
+            <column name="manufacturer" value="Lenovo"/>
+            <column name="model" value="ThinkPad"/>
+            <column name="screen_size" value="15"/>
+            <column name="screen_resolution" value="1920x1080"/>
+            <column name="processor_line" value="AMD Ryzen 3"/>
+            <column name="processor_core_count" value="4"/>
+            <column name="ram_capacity" value="8"/>
+            <column name="storage_type" value="SSD"/>
+            <column name="drive_capacity" value="256"/>
+            <column name="os" value="Windows 11 Pro"/>
+        </insert>
+    </changeSet>
+</databaseChangeLog>

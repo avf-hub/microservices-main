@@ -1,0 +1,54 @@
+GET http://localhost:8001/publish?word=123
+
+###
+
+GET http://localhost:8001/publish?word=next4
+
+###
+GET http://localhost:8001/publish?word=aaa
+
+###
+GET http://localhost:8001/publish?word=hello7
+
+###
+GET http://localhost:8001/publish?word=no-ack
+
+###
+GET http://localhost:8001/publish?word=hello
+
+###
+GET http://localhost:8001/publish?word=bye
+
+###
+GET http://localhost:8001/publish?word=hello
+
+###
+GET http://localhost:8001/publish?word=hello
+
+###
+GET http://localhost:8001/publish?word=bye
+
+###
+GET http://localhost:8001/publish?word=hello
+
+###
+GET http://localhost:8001/publish?word=hello
+
+###
+GET http://localhost:8001/publish?word=bye
+
+###
+GET http://localhost:8001/publish?word=hello
+
+###
+GET http://localhost:8001/publish?word=hello
+
+###
+GET http://localhost:8001/publish?word=bye
+
+###
+GET http://localhost:8002/
+
+###
+GET http://localhost:8003/
+

@@ -1,0 +1,149 @@
+@startuml
+autonumber
+actor "Пользователь" as User
+participant "Bank" as Bank
+database "Event Store" as EventStore
+
+== 🏦 Создание нового счёта ==
+
+User -> Bank: createAccount(name, initialDeposit)
+Bank -> Bank: generate UUID for new account
+note right
+    🔹 Генерируем уникальный ID для нового аккаунта.
+    🔹 Вся история изменений аккаунта будет
+      привязана к этому UUID.
+end note
+
+Bank -> EventStore: save AccountCreated event
+note right
+    📌 Записываем событие **AccountCreated**
+    в Event Store.
+    Это позволит восстановить этот аккаунт
+    в будущем, если потребуется.
+end note
+
+Bank -> User: account created ✅
+
+== 💰 Пополнение счёта ==
+
+User -> Bank: deposit(accountId, amount)
+Bank -> EventStore: save MoneyDeposited
+note right
+    💰 Записываем событие **MoneyDeposited**
+    в Event Store.
+end note
+
+Bank -> User: deposit complete ✅
+
+== 💸 Снятие денег ==
+
+User -> Bank: withdraw(accountId, amount)
+
+Bank -> Bank: validate balance
+Bank -> EventStore: save MoneyWithdrawn
+note right
+    ❌ Проверяем баланс перед снятием.
+    Если денег достаточно – создаём событие **MoneyWithdrawn**.
+end note
+
+Bank -> User: withdrawal complete ✅
+
+== 🔄 Перевод денег (с проверкой баланса) ==
+
+User -> Bank: transfer(fromId, toId, amount)
+
+Bank -> Sender: validate balance
+Sender -> Bank: check balance
+note right
+    ❌ Проверяем, достаточно ли средств
+    у отправителя перед переводом.
+end note
+
+Bank -> EventStore: save MoneyWithdrawn
+Bank -> EventStore: save MoneyDeposited
+note right
+    💸 Если баланс в порядке, записываем
+    события **MoneyWithdrawn** и **MoneyDeposited**.
+end note
+
+Bank -> User: transfer complete ✅
+
+== ⚡ Перевод денег (без проверки баланса) ==
+
+User -> Bank: transferWithoutChecks(fromId, toId, amount)
+
+Bank -> EventStore: save MoneyWithdrawn (без проверки)
+Bank -> EventStore: save MoneyDeposited (без проверки)
+note right
+    ⚠️ Этот метод просто записывает события
+    **без проверки баланса отправителя**.
+    Его можно использовать для транзакций,
+    проверяемых другими сервисами.
+end note
+
+Bank -> User: transfer complete ✅
+
+== 🕰️ Восстановление состояния аккаунта (Time Travel) ==
+
+User -> Bank: getBalanceAtTimestamp(accountId, timestamp)
+
+Bank -> EventStore: load all events up to timestamp
+EventStore -> Bank: return filtered events
+Bank -> Bank: replay events until timestamp
+note right
+    ⏳ Загружаем **все события** до определённого времени.
+    Позволяет откатить состояние к нужному моменту.
+end note
+
+Bank -> User: restored balance ✅
+
+== 🏷️ Создание снепшота состояния ==
+
+User -> Bank: createSnapshot(accountId)
+
+Bank -> EventStore: calculate current balance
+Bank -> EventStore: save SnapshotCreated event
+note right
+    📌 Создаём событие **SnapshotCreated**
+    с текущим балансом, чтобы ускорить
+    последующее восстановление.
+end note
+
+Bank -> User: snapshot created ✅
+
+== 🔄 Восстановление из снепшота ==
+
+User -> Bank: restoreFromSnapshot(accountId)
+
+Bank -> EventStore: load last SnapshotCreated event
+EventStore -> Bank: return last known balance
+Bank -> EventStore: load events after snapshot
+EventStore -> Bank: return events
+Bank -> Bank: replay events after snapshot
+note right
+    ⚡ Вместо загрузки всех событий,
+    используем последний **снепшот** и
+    применяем только новые события.
+    Восстановление происходит быстрее!
+end note
+
+Bank -> User: account restored ✅
+
+== 🛑 Проверка подозрительных операций ==
+
+User -> Bank: detectFraud(accountId)
+
+Bank -> EventStore: load all events for Account
+EventStore -> Bank: return events
+
+loop Проверка каждой транзакции
+    Bank -> Bank: check event type and amount
+    note right
+        🔍 Если сумма снятия больше 500,
+        фиксируем подозрительную операцию
+        и отправляем предупреждение.
+    end note
+end
+
+Bank -> User: fraud check complete 🔍
+@enduml

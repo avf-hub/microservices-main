@@ -1,0 +1,103 @@
+@startuml
+autonumber
+
+actor User
+
+participant "Ordering Service\n(8085)" as Ordering
+participant "Payment Service\n(8086)" as Payment
+participant "Shipping Service\n(8087)" as Shipping
+participant "Order Tracking Service\n(8084)" as Tracking
+
+== Размещение заказа ==
+User -> Ordering: POST http://localhost:8085/orders
+note right
+Создание заказа:
+- customerId = 1
+- items = [
+  { productId: 1, cost: 2000, qty: 1 },
+  { productId: 2, cost: 1500, qty: 2 }
+]
+Возвращает orderId
+end note
+Ordering -> User: { "id": 1, "status": "PLACED" }
+
+== Подтверждение заказа ==
+User -> Ordering: [[http://localhost:8085/orders/1/verification PUT /orders/verification]]
+note right
+Подтверждение заказа:
+- orderId = 1
+Меняет статус заказа на CONFIRMED
+end note
+Ordering -> User: { "id": 1, "status": "CONFIRMED" }
+
+== Оплата заказа ==
+User -> Payment: [[http://localhost:8086/payments/byOrder/1 POST /payments]]
+note right
+Оплата заказа:
+- orderId = 1
+Запускает процесс оплаты
+end note
+Payment -> User: "paymentId": 2
+
+User -> Payment: [[http://localhost:8086/payments/byOrder/1/status GET /payments/status]]
+note right
+Статус платежа:
+- orderId = 1
+Сначала "IN_PROCESS", затем "PAID"
+end note
+Payment -> User: "IN_PROCESS"
+
+...Ждём 30 секунд...
+
+User -> Payment: [[http://localhost:8086/payments/byOrder/1/status GET /payments/status]]
+Payment -> User: "PAID"
+
+== Автоматический запуск доставки ==
+Ordering -> Shipping: [[http://localhost:8087/shipping/1 PUT /shipping]]
+note right
+Так как заказ оплачен, доставка запускается автоматически
+(уже реализовано в задании 2).
+Возвращает deliveryId - идентификатор доставки.
+end note
+Shipping -> Ordering: "deliveryId": 3
+
+User -> Shipping: [[http://localhost:8087/shipping/1/status GET /shipping/{{shippingId}}/status]]
+Shipping -> User: "IN_DELIVERY"
+
+== Отслеживание состояния заказа ==
+User -> Tracking: [[http://localhost:8084/1 GET http://localhost:8084/{{orderId}}]]
+note right
+Запрос статуса заказа:
+- orderId = 1
+Возвращает статусы заказа, оплаты и доставки
+end note
+Tracking -> Ordering: Запрос статуса заказа
+Ordering -> Tracking: { "status": "CONFIRMED" }
+Tracking -> Payment: Запрос статуса оплаты
+Payment -> Tracking: { "status": "PAID" }
+Tracking -> Shipping: Запрос статуса доставки
+Shipping -> Tracking: { "status": "IN_DELIVERY" }
+Tracking -> User: { "orderStatus": "CONFIRMED", "paymentStatus": "PAID", "shippingStatus": "IN_DELIVERY" }
+
+== Отмена доставки (Trigger Refund) ==
+User -> Shipping: [[http://localhost:8087/shipping/1 DELETE /shipping/{{orderId}}]]
+note right
+Отмена доставки:
+- orderId = 1
+Запускает процесс возврата денег (refund)
+end note
+Shipping -> User: "CANCELLED"
+
+== Компенсация: возврат денег ==
+Shipping -> Payment: [[http://localhost:8086/payments/refund/1 POST /refund]]
+note right
+Автоматический возврат платежа:
+- orderId = 1
+Платёж возвращается
+end note
+Payment -> User: "REFUNDED"
+
+== Логирование в PaymentService ==
+Payment -> Log: "Payment refunded for orderId=1"
+
+@enduml

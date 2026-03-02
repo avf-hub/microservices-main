@@ -1,0 +1,254 @@
+:toc:
+:toclevels: 2
+
+= Задание 1. Синхронная коммуникация
+
+== Реализация интеграции order-tracking-service и shipping-service
+
+Наш сервис отслеживания заказов (`order-tracking-service`) предоставляет REST-эндпоинт для запроса текущего состояния заказа.
+В настоящее время **возвращаемый DTO содержит неполные данные**, поскольку информация о статусе доставки всегда имеет значение `"UNKNOWN"`.
+
+[source,java]
+----
+@Getter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class OrderTrackingInfo {
+	OrderStatus orderStatus;
+	PaymentStatus paymentStatus;
+
+	public String getShippingStatus() {
+		return "UNKNOWN";
+	}
+}
+----
+
+Чтобы исправить это, необходимо **реализовать интеграцию между `order-tracking-service` и `shipping-service`**,
+чтобы клиент получал **фактический статус доставки** вместо заглушечного значения.
+
+Для этого мы будем использовать **Feign-клиент для взаимодействия с `shipping-service`** через REST API.
+
+Вот как это будет выглядеть:
+
+[plantuml,plantuml-diagram,svg]
+----
+@startuml
+autonumber
+
+actor User
+participant "OrderTrackingController" as OrderTracking
+participant "OrderingServiceClient" as OrderingService
+database "Order DB" as OrderDB
+participant "PaymentServiceClient" as PaymentService
+database "Payment DB" as PaymentDB
+participant "ShippingServiceClient" as ShippingService
+database "Shipping DB" as ShippingDB
+
+User -> OrderTracking: getOrderStatus(orderId)
+OrderTracking -> OrderingService: getOrderStatus(orderId)
+OrderingService -> OrderDB: find order
+OrderDB -> OrderingService: return order details
+OrderingService -> OrderTracking: return order status
+
+OrderTracking -> PaymentService: getStatusByOrder(orderId)
+PaymentService -> PaymentDB: find payment status
+PaymentDB -> PaymentService: return status
+PaymentService -> OrderTracking: return payment status
+
+OrderTracking -> ShippingService: getShippingStatus(orderId)
+ShippingService -> ShippingDB: find shipping status
+ShippingDB -> ShippingService: return shipping status
+ShippingService -> OrderTracking: return shipping status
+
+OrderTracking -> User: return\n - Order status\n - Payment status\n - Shipping status
+
+@enduml
+----
+
+Здесь **`OrderTrackingController`** запрашивает статус заказа у `OrderingServiceClient`, `PaymentServiceClient` и `ShippingServiceClient`. Получение статуса у `OrderingServiceClient` и `PaymentServiceClient` уже реализовано.
+
+Нам осталось добавить интеграцию с `ShippingServiceClient` для получения статуса доставки.
+
+== Реализация
+
+1. **Добавьте зависимость `shipping-shared-model` в `order-tracking-shared-model`**.
+2. **Создайте Feign-клиент для `Shipping Service`**.
+3. **Обновите DTO `OrderTrackingInfo`**.
+4. **Добавьте интеграцию в `OrderTrackingController`**.
+
+
+=== Шаг 1. Подключение зависимостей
+
+Добавьте зависимость `shipping-shared-model` в `order-tracking-shared-model`.
+Эта зависимость **автоматически станет доступной** в `order-tracking-service` благодаря транзитивному импорту.
+
+[source,groovy]
+.laptop-store/order-tracking-shared-model/build.gradle
+----
+dependencies {
+    api project(':laptop-store-ordering-shared-model')
+    api project(':laptop-store-payment-shared-model')
+    api project(':laptop-store-shipping-shared-model') // +++
+}
+----
+
+После добавления зависимости **пересоберите Gradle-проект**, чтобы IntelliJ IDEA корректно её подтянула.
+
+=== Шаг 2. Создайте Feign-клиент для Shipping Service
+
+Перейдите в пакет `store.laptop.ordertracking.client` в проекте `order-tracking-service`.
+Этот пакет **уже содержит `OrderServiceClient` и `PaymentServiceClient`**, их можно использовать как образец.
+
+Создайте новый Feign-клиент:
+
+[source,java]
+----
+@FeignClient(name = "shipping",
+	url = "#{serviceCommonConfig['shipping-service'].url}/shipping")
+public interface ShippingServiceClient extends ShippingAPI {
+
+}
+----
+
+Если `ShippingAPI` не удаётся импортировать – **обновите зависимости Gradle**.
+
+=== Шаг 3. Обновите DTO OrderTrackingInfo
+
+[source,java]
+.OrderTrackingInfo.java
+----
+@Getter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class OrderTrackingInfo {
+	OrderStatus orderStatus;
+	PaymentStatus paymentStatus;
+	ShippingStatus shippingStatus; // <1>
+
+	// Удалите метод-заглушку:
+	// public String getShippingStatus() {
+	//	return "UNKNOWN";
+	//}
+}
+----
+<1> Теперь используется **фактический статус доставки** вместо фиксированного значения `"UNKNOWN"`.
+
+=== Шаг 4. Добавьте интеграцию в OrderTrackingController
+
+Добавьте в конструктор `OrderTrackingController` зависимость `ShippingServiceClient`:
+
+[source,java]
+.OrderTrackingController.java
+----
+public OrderTrackingController(OrderingServiceClient orderingServiceClient,
+                               PaymentServiceClient paymentServiceClient,
+                               ShippingServiceClient shippingServiceClient) {
+    this.orderingServiceClient = orderingServiceClient;
+    this.paymentServiceClient = paymentServiceClient;
+    this.shippingServiceClient = shippingServiceClient;
+}
+----
+
+Используйте новый клиент для заполнения `OrderTrackingInfo`:
+
+[source,java]
+.OrderTrackingController.java
+----
+public OrderTrackingInfo getOrderStatus(Long orderId) {
+    try {
+        OrderInfo orderInfo = orderingServiceClient.getOrderStatus(orderId);
+
+        PaymentStatus paymentStatus = null;
+        if (orderInfo.getStatus() == OrderStatus.CONFIRMED ||
+            orderInfo.getStatus() == OrderStatus.CANCELED
+        ) {
+            paymentStatus = paymentServiceClient.getStatusByOrder(orderId);
+        }
+
+        ShippingStatus shippingStatus =                     // +++
+          shippingServiceClient.getShippingStatus(orderId); // +++
+
+        return OrderTrackingInfo.builder()
+            .orderStatus(orderInfo.getStatus())
+            .paymentStatus(paymentStatus)
+            .shippingStatus(shippingStatus) // +++
+            .build();
+
+    } catch (Exception e) {
+        throw new OrderTrackingException("Error in tracking order",
+            orderId, e);
+    }
+}
+----
+
+На этом реализация интеграции завершена.
+
+== Тестирование
+
+Используйте **REST-запросы из `laptop-store/_http/rest.http`**,
+в которых уже подготовлены сценарии обработки заказов.
+
+=== Шаги тестирования:
+
+1. **Создайте заказ**
+- Для этого отправьте запрос `POST /orders` с телом заказа.
++
+    Смотрите в laptop-store/_http/rest.http.
++
+- Ожидаемый статус: `PLACED`
+
+2. **Подтвердите заказ**
+- Для этого отправьте запрос `PUT /orders/{{orderId}}/verification`
+- Ожидаемый статус: `CONFIRMED`
+
+3. **Запросить статус заказа в `OrderTrackingService`**
+- Используйте запрос `GET /tracking/{{orderId}}`
+- Поле `shippingStatus` должно содержать `UNKNOWN`
+
+4. **Инициируйте доставку**
+- Для этого отправьте запрос `PUT /shipping/{{orderId}}`
+- Поле `shippingStatus` должно измениться на `IN_DELIVERY`
+- Если статус не изменился, у вас что-то пошло не так. Проверьте реализацию каждого шага.
+
+5. **Проверьте статус через 1 минуту**
+- Поле `shippingStatus` должно измениться на `DELIVERED`
+
+=== Поздравляем! Задание выполнено! 🎉
+
+Теперь сервис отслеживания заказов **показывает актуальный статус доставки**.
+
+== Дополнительное задание: реализация верификации заказа
+
+В настоящее время **процесс верификации в `Ordering Service` реализован только на уровне смены статуса заказа**.
+Однако **реальная верификация отсутствует** – система **не проверяет наличие товаров на складе** перед подтверждением заказа.
+
+=== Задача
+Добавить **настоящий процесс верификации**, который:
+
+- **Запрашивает информацию о наличии товаров в `Inventory Service`**
+- **Если товары есть в наличии** → резервирует их **и меняет статус заказа на `CONFIRMED`**
+- **Если товаров нет** → меняет статус заказа на `REJECTED` (новый статус)
+
+=== Шаги реализации
+1. Добавьте **интеграцию `Ordering Service` с `Inventory Service`** через Feign клиент.
+2. При верификации заказа:
+- Отправьте **запрос на резервирование товара** в `Inventory Service`.
+- Если резервирование успешно → установите статус заказа в `CONFIRMED`.
+- Если резервирование не удалось → установите новый статус `REJECTED`.
+3. Обновите `OrderTrackingService`, чтобы он **правильно обрабатывал статус `REJECTED`**.
+
+Теперь заказ будет **подтверждён только при наличии товаров на складе**.
+
+Если товаров нет – заказ **будет отклонён автоматически**.
+
+=== Итог
+
+После реализации:
+
+- `OrderTrackingService` будет **возвращать актуальный статус доставки**.
+- `OrderingService` **реально проверяет наличие товара** перед подтверждением заказа.
+- Интеграция **с `Shipping Service` теперь полностью рабочая**.
+
+Теперь процесс заказа **стал более надёжным, а интеграция завершена**!

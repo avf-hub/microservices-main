@@ -1,0 +1,16 @@
+plugins {
+    id 'training.boot-app'
+}
+
+group = 'training.jva083.comm'
+
+dependencies {
+    implementation project(":03-comm-rest-bookservice-api")
+
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.cloud:spring-cloud-starter-openfeign'
+    implementation 'org.springframework.cloud:spring-cloud-starter-loadbalancer'
+}
+
+jib.to.image = "bookreviews:v1"

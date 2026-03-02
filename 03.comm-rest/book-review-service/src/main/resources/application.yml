@@ -1,0 +1,14 @@
+spring:
+  application:
+    name: book-reviews
+  jackson:
+    default-property-inclusion: non_null
+  cloud:
+    discovery:
+      client:
+        simple:
+          instances:
+            book-service:
+              - uri: http://localhost:6081
+server:
+  port: 6080

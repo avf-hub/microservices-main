@@ -1,0 +1,8 @@
+plugins {
+    id 'training.laptop-store-service'
+}
+
+dependencies {
+    implementation project(':laptop-store-common-config')
+    implementation project(':laptop-store-ordering-shared-model')
+}

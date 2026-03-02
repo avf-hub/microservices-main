@@ -1,0 +1,36 @@
+= Security
+
+Description: Create test case to check that JWT token is provided in the request and it's valid.
+Istio validates the token using the public key set (provided in RequestAuthentication 'jwksUri' attribute) and rejects
+requests if the bearer token is invalid. (request-authentication.yaml)
+To reject requests without valid tokens, we need to add an authorization policy (jwt-validation.yaml).
+
+[source,shell]
+.deploy app resources
+----
+kubectl apply -f .
+----
+
+[source,shell]
+.send request to mouse-catalog without Authorization header - results in HTTP403
+----
+curl -sv http://localhost/mice/1
+----
+
+[source,shell]
+.send request to mouse-catalog without invalid token in Authorization header - results in HTTP401
+----
+curl -sv -H "Authorization: Bearer SomeInvalidToken" http://localhost/mice/1
+----
+
+[source,shell]
+.send request to mouse-catalog without valid token in Authorization header - results in proper response
+----
+curl -sv -H @request-headers.txt http://localhost/mice/1 | jq -C .
+----
+
+[source,shell]
+.do not forget to clean up before trying out other examples
+----
+kubectl delete -f .
+----

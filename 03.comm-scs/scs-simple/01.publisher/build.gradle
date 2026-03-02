@@ -1,0 +1,3 @@
+plugins {
+    id 'training.spring-cloud-stream-app'
+}

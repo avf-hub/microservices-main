@@ -1,0 +1,3 @@
+grpc:
+  port: 6565
+  enable-reflection: true

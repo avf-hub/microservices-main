@@ -1,0 +1,116 @@
+### DEMOS
+# Execute OrchestratorApplication, Bank1Application and Bank2Application
+
+### 1: create account in Bank 1
+
+POST http://localhost:9181/account?balance=1000
+
+> {%
+    client.global.set('id', response.body);
+%}
+
+### 2: check account in Bank 1
+
+GET http://localhost:9181/account/{{id}}
+
+### 3: create account in Bank 2
+
+POST http://localhost:9182/account?balance=1000
+
+> {%
+    client.global.set('id2', response.body);
+%}
+
+### 4: check account in Bank 2
+
+GET http://localhost:9182/account/{{id2}}
+
+# Scenario 1: successfull money transfer
+### 5: money transfer
+# use wrong account number to simulate failed transfer
+
+POST http://localhost:9185/transfer
+Content-Type: application/json
+
+{
+  "bankFrom": "BANK1",
+  "accountIdFrom": "{{id}}",
+  "bankTo": "BANK2",
+  "accountIdTo": "{{id2}}",
+  "amount": "100.0"
+}
+
+> {%
+    client.global.set('uuid', response.body);
+%}
+
+### 6: State of the transfer: in process, cancelled or completed
+
+GET http://localhost:9185/transfer?uuid={{uuid}}
+
+### 7: Money on account in BANK1 should be decreased by 100
+
+GET http://localhost:9181/account/{{id}}
+
+### 8: Money on account in BANK2 should be increased by 100
+
+GET http://localhost:9182/account/{{id2}}
+
+
+# Scenario 2
+### 9: failed money transfer: wrong data
+# use wrong account number (11) to simulate failed transfer
+# (second section is failed, whole transaction is rolled back)
+
+POST http://localhost:9185/transfer
+Content-Type: application/json
+
+{
+  "bankFrom": "BANK1",
+  "accountIdFrom": "{{id}}",
+  "bankTo": "BANK2",
+  "accountIdTo": "11",
+  "amount": "100.0"
+}
+
+> {%
+    client.global.set('uuid', response.body);
+%}
+
+### 10: Check the transfer state
+
+GET http://localhost:9185/transfer?uuid={{uuid}}
+
+### 11: Money on account in BANK1 should be not changed (rolled back)
+
+GET http://localhost:9181/account/{{id}}
+
+# Scenario 3
+### 12: Failed money transfer: service is unavailable
+# stop service SagaBank2App before running!
+
+POST http://localhost:9185/transfer
+Content-Type: application/json
+
+{
+  "bankFrom": "BANK1",
+  "accountIdFrom": "{{id}}",
+  "bankTo": "BANK2",
+  "accountIdTo": "{{id2}}",
+  "amount": "100.0"
+}
+
+> {%
+    client.global.set('uuid', response.body);
+%}
+
+### 13: Check the transfer state
+
+GET http://localhost:9185/transfer?uuid={{uuid}}
+
+# state should be in process for 10 seconds, then it should be cancelled
+# because of Bank2Application unavailability
+
+### 14: Money on account in BANK1 should be not changed (rolled back)
+
+GET http://localhost:9181/account/{{id}}

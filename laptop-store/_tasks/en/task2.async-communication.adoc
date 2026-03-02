@@ -1,0 +1,157 @@
+= Task 2. Implementing asynchronous communication using Spring Cloud Stream
+
+=== Introduction
+
+We want to automatically start shipping after the payment.
+
+We will use Spring Cloud Stream to enable asynchronous communication between services.
+
+Some of the code already is in place.
+
+=== Starting Kafka
+
+Go to `infra/kafka` folder and run:
+
+[source,shell]
+----
+docker compose up -d
+----
+
+This will start up your local Kafka cluster. If you use IntelliJ IDEA you can also  right-click on `infra/kafka/docker-compose.yaml` and choose `Run` command.
+
+If you are not allowed to use Docker (as it is not free for commercial use), you can use Podman instead. You can install Podman on your machine and use it as a drop-in replacement for Docker. https://podman-desktop.io/docs/installation/windows-install/
+
+Then, you can run the following command to start Kafka:
+[source,shell]
+----
+podman compose --file docker-compose.yaml up --detach
+----
+
+=== Adding Kafka binder dependency
+
+Spring Cloud Stream Kafka binder dependency is already added to your laptop service projects:
+
+[source,groovy]
+.buildSrc/src/main/groovy/training.laptop-store-service.gradle
+----
+dependencies {
+// among others
+    implementation 'org.springframework.cloud:spring-cloud-starter-stream-kafka'
+}
+----
+
+Enable message publishing:
+
+[source,yaml]
+.laptop-store/ordering-service/src/main/resources/application.yml
+----
+app:
+  disable-message-publishing: false
+----
+
+Now you should be able to check if invoice is automatically created after placing an order.
+To do it, you can create an order and then use this endpoint in the end of *rest.http*:
+[source,http]
+----
+### invoice.1: fetch invoice
+GET http://{{invoicing-host}}:{{invoicing-port}}/invoices/byOrder/{{order-id}}
+----
+
+=== Sending messages from PaymentService
+
+We need to automatically start shipping after the payment.
+For this, we will send a message to *paid-orders* topic with orderId of the paid order.
+Then, ShippingService should receive this message and start shipping.
+
+PaymentService doesn't move the status to PAID immediately. Instead, the order is moved to PaymentStatus.IN_PROCESS, and only after 30s delay it is moved to PAID status. It is done to imitate the asynchronous nature of payment process.
+
+Thus, payment status is passing these phases:
+
+UNPAID -> IN_PROCESS -> (30 sec delay) -> PAID
+
+Method processPayments() in PaymentService is executed every 30 sec, polls for the payments in status IN_PROCESS, and moves it to PAID status.
+
+We want to additionally send a message with orderId to the paid-orders topic to be consumed by the Shipping Service:
+
+
+[source,java]
+.PaymentService.java
+----
+@Scheduled(fixedRate = 30, timeUnit = TimeUnit.SECONDS)
+@Transactional
+public void processPayments() {
+    DelayedId delayedId = paymentsQueue.poll();
+    if (delayedId != null) {
+       Payment payment =
+          paymentRepository.findById(delayedId.getId()).orElseThrow();
+       payment.setPaymentStatus(PaymentStatus.PAID);
+       paymentRepository.save(payment);
+       startShipment(payment.getOrderId());     // +++
+    }
+}
+
+public void startShipment(Long orderId) {       // +++
+    streamBridge.send("paid-orders", orderId);  // +++
+}                                               // +++
+
+----
+
+When you place the order now - you should see messages being published to Kafka topic (use web UI to inspect topic contents).
+
+== Receiving messages in Shipping Service.
+
+In Shipping Service, add this configuration to handlers package:
+
+[source,java]
+.MessageHandlersConfiguration.java
+----
+@Configuration
+public class MessageHandlersConfiguration {
+    private final ShippingService shippingService;
+
+    public MessageHandlersConfiguration(ShippingService shippingService) {
+        this.shippingService = shippingService;
+    }
+
+    @Bean
+    public Consumer<Long> shippingAfterPayment() {
+        return shippingService::startShipping;
+    }
+}
+----
+
+Also, you need to add configuration to application.yaml of Shipping Service to receive shipping messages:
+
+[source,yaml]
+.application.yaml
+----
+spring:
+  cloud:
+    stream:
+      bindings:
+        shippingAfterPayment-in-0:
+          destination: paid-orders
+          group: shipping
+----
+
+Now, you should be able to see the changes in shipping status after sending order for the payment. Don’t forget to restart the Ordering and Shipping service.
+
+== Testing
+
+To test the work, use *rest.http*:
+
+* place an order
+* verify an order
+* make a payment for the order
+* check the shipping status at the Shipping Service - it should change to IN_DELIVERY automatically
+
+Also, you can use the Order Tracking Service to get the status collected from all services.
+
+== Advanced Task
+
+Currently, Order Tracking Service shows the order status of all the data by collecting it from Ordering Service, Payment Service, and Shipping Service. It takes a lot of time and creates a load on the system.
+
+Refactor Order Tracking Service: it should collect current information about every service by using messaging. For example, if the order is paid, Order Tracking Service should receive the message and update its internal database. This way, it will be able to provide the status immediately without the need to query all services.
+
+
+

@@ -1,0 +1,61 @@
+# Common configuration
+spring:
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-invoicing.xml
+  h2:
+    console:
+      enabled: true
+      settings:
+        web-allow-others: true
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+  datasource:
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: password
+  application:
+    name: invoicing-service
+  cloud:
+    stream:
+      bindings:
+        processOrder2Invoice-in-0:
+          destination: orders
+
+
+# Profile-specific configuration
+---
+spring:
+  config:
+    activate:
+      on-profile: default
+  datasource:
+    url: jdbc:h2:mem:invoices
+
+---
+spring:
+  config:
+    activate:
+      on-profile: database-per-service
+  datasource:
+    url: jdbc:h2:~/data/invoices;AUTO_SERVER=TRUE
+
+---
+spring:
+  config:
+    activate:
+      on-profile: shared-database
+  datasource:
+    url: jdbc:h2:tcp://h2-server:1521/opt/h2-data/laptop_store
+  h2:
+    console:
+      enabled: false
+---
+spring:
+  config:
+    activate:
+      on-profile: docker-compose
+  cloud:
+    stream:
+      kafka:
+        binder:
+          brokers: kafka-redpanda:9092

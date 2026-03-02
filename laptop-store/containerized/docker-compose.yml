@@ -1,0 +1,109 @@
+version: "3.8"
+
+include:
+  - path:
+      - ../../infra/kafka/docker-compose.yaml
+
+
+x-common-variables: &common-variables
+  SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE}
+  SPRING_DATASOURCE_URL: jdbc:h2:~/data/db
+  SPRING_DATASOURCE_USERNAME: sa
+  SPRING_DATASOURCE_PASSWORD: password
+
+services:
+  catalog-service:
+    image: nexus.dev.local:9200/laptop-store-catalog-service:${SYSTEM_VERSION}
+    environment:
+      <<: *common-variables
+    ports:
+      - "8081:8080"
+    depends_on:
+      - h2-server
+
+  inventory-service:
+    image: nexus.dev.local:9200/laptop-store-inventory-service:${SYSTEM_VERSION}
+    environment:
+      <<: *common-variables
+    ports:
+      - "8082:8080"
+    depends_on:
+      - h2-server
+
+  #  invoicing-service:
+  #    image: nexus.dev.local:9200/laptop-store-invoicing-service:${SYSTEM_VERSION}
+  #    environment:
+  #      # The value should be set via .env file from ./docker directory.
+  #      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE}
+  #    volumes:
+  #      - invoicing-service-data:/home/data
+  #    ports:
+  #      - "8083:8080"
+  #    networks:
+  #      - microservices-network-tier
+  #      - private-network-tier
+  #    depends_on:
+  #      - h2-server
+  #      - kafka-redpanda
+
+  order-tracking-service:
+    image: nexus.dev.local:9200/laptop-store-order-tracking-service:${SYSTEM_VERSION}
+    environment:
+      <<: *common-variables
+    ports:
+      - "8084:8080"
+    depends_on:
+      - h2-server
+
+  ordering-service:
+    image: nexus.dev.local:9200/laptop-store-ordering-service:${SYSTEM_VERSION}
+    environment:
+      <<: *common-variables
+    ports:
+      - "8085:8080"
+    depends_on:
+      - h2-server
+
+  payment-service:
+    image: nexus.dev.local:9200/laptop-store-payment-service:${SYSTEM_VERSION}
+    environment:
+      <<: *common-variables
+    ports:
+      - "8086:8080"
+    depends_on:
+      - h2-server
+
+  shipping-service:
+    image: nexus.dev.local:9200/laptop-store-shipping-service:${SYSTEM_VERSION}
+    environment:
+      <<: *common-variables
+    ports:
+      - "8087:8080"
+    depends_on:
+      - h2-server
+      - redpanda
+
+  shopping-cart-service:
+    image: nexus.dev.local:9200/laptop-store-shopping-cart-service:${SYSTEM_VERSION}
+    environment:
+      <<: *common-variables
+    ports:
+      - "8088:8080"
+    depends_on:
+      - h2-server
+
+  # Separate H2 Database is needed for shared-database mode
+  h2-server:
+    image: oscarfonts/h2
+    ports:
+      - "1521:1521"
+      - "8100:81"
+    environment:
+      # Allow creating a database on connect if not exists
+      - H2_OPTIONS=-ifNotExists
+    volumes:
+      - h2-server-data:/opt/h2-data
+
+volumes:
+  h2-server-data:
+    driver: local

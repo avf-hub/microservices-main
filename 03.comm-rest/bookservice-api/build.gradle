@@ -1,0 +1,20 @@
+plugins {
+    id 'java-library'
+    id 'training.java'
+}
+
+group = 'training.jva083.comm'
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            artifact tasks.named("jar")
+        }
+    }
+}
+
+dependencies {
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+    implementation 'org.springframework:spring-web'
+}

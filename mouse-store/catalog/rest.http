@@ -1,0 +1,8 @@
+
+### Get mouses and reviews
+
+GET http://localhost:8080/
+
+### Get information about a single mouse
+
+GET http://localhost:8080/1

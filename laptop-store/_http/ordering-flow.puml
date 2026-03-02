@@ -1,0 +1,175 @@
+@startuml
+autonumber
+
+actor User
+
+participant "Catalog Service\n(8081)" as Catalog
+participant "Inventory Service\n(8082)" as Inventory
+participant "Ordering Service\n(8085)" as Ordering
+participant "Payment Service\n(8086)" as Payment
+participant "Shipping Service\n(8087)" as Shipping
+participant "Order Tracking Service\n(8084)" as Tracking
+participant "Invoice Service\n(8083)" as Invoice
+
+== Поиск товара ==
+User -> Catalog: [[http://localhost:8081/catalog?manufacturer=Apple&ramCapacity=8&storageType=SSD]]
+note right
+Поиск товаров по параметрам:
+- manufacturer = Apple
+- ramCapacity = 8 GB
+- storageType = SSD
+Получаем список подходящих моделей
+end note
+Catalog -> User: Список товаров
+
+== Проверка наличия и резервирование ==
+User -> Inventory: [[http://localhost:8082/inventory/byProduct/1 GET /inventory/byProduct]]
+note right
+Проверка остатка на складе:
+{
+    "inventoryId": 1,
+    "productId": 1,
+    "availableQty": 7,
+    "unitCost": 1300
+}
+Возвращает количество доступных единиц и стоимость за штуку.
+end note
+Inventory -> User: Доступное количество
+
+User -> Inventory: POST /inventory \n {"inventoryItemId": 1, "requiredQty": 1}
+note right
+Резервирование товара:
+Возвращает идентификатор резервации
+end note
+Inventory -> User: {  "id": 1,  "status": "CONFIRMED" }
+
+== Создание заказа ==
+User -> Ordering: POST http://localhost:8085/orders \n {"customerId": 1, "items": [ { "productId": 1, "cost": 3500, "qty": 1 }, { "productId": 2, "cost": 2700, "qty": 1 } ]}
+note right
+Создание нового заказа:
+{
+    "customerId": 1,
+    "items": [
+        { "productId": 1, "cost": 3500, "qty": 1 },
+        { "productId": 2, "cost": 2700, "qty": 1 }
+    ]
+}
+Возвращает ID созданного заказа.
+end note
+Ordering -> Inventory: Проверка резервации
+Inventory -> Ordering: OK
+Ordering -> User: { "id": 1, "status": "PLACED" }
+
+== Подтверждение заказа ==
+User -> Ordering: PUT /orders/{{orderId}}/verification
+note right
+Подтверждение заказа:
+- orderId = 1
+Меняет статус заказа на CONFIRMED, если заказ подтверждён.
+end note
+Ordering -> User: { "id": 1, "status": "CONFIRMED" }
+
+== Отслеживание заказа (до оплаты) ==
+User -> Tracking: [[http://localhost:8084/1 GET /tracking]]
+note right
+Возвращает статусы заказа, оплаты и доставки:
+{
+    "orderStatus": "CONFIRMED",
+    "paymentStatus": "UNPAID",
+    "shippingStatus": "UNKNOWN"
+}
+
+Возвращает статусы заказа, оплаты и доставки
+end note
+Tracking -> Ordering: Запрос статуса заказа
+Ordering -> Tracking: { "status": "CONFIRMED" }
+Tracking -> Payment: Запрос статуса оплаты
+Payment -> Tracking: { "status": "UNPAID" }
+Tracking -> Shipping: Запрос статуса доставки
+Shipping -> Tracking: { "status": "UNKNOWN" }
+Tracking -> User: { "orderStatus": "CONFIRMED", "paymentStatus": "UNPAID", "shippingStatus": "UNKNOWN" }
+
+== Оплата заказа ==
+User -> Payment: [[http://localhost:8086/payments/byOrder/1 POST /payments]]
+note right
+Оплата заказа:
+- orderId = 1
+Возвращает paymentId
+end note
+Payment -> User: "paymentId": 2
+
+User -> Payment: [[http://localhost:8086/payments/byOrder/1/status GET /payments/status]]
+note right
+Проверяем статус оплаты:
+- orderId = 1
+Возвращает "IN_PROCESS" (в обработке)
+end note
+Payment -> User: "IN_PROCESS"
+
+...Ждём 30 секунд...
+
+User -> Payment: [[http://localhost:8086/payments/byOrder/1/status GET /payments/status]]
+note right
+Оплата завершена:
+- orderId = 1
+Возвращает "PAID"
+end note
+Payment -> User: "PAID"
+
+== Запуск доставки ==
+User -> Shipping: PUT http://localhost:8087/shipping/{{orderId}}
+note right
+Запуск доставки:
+- orderId = 1
+Возвращает deliveryId
+end note
+Shipping -> User: "deliveryId": 2
+
+User -> Shipping: [[http://localhost:8087/shipping/1/status GET /shipping/status]]
+note right
+Проверка статуса доставки:
+- orderId = 1
+Возвращает "IN_DELIVERY"
+end note
+Shipping -> User: "IN_DELIVERY"
+
+== Повторная проверка отслеживания заказа ==
+User -> Tracking: [[http://localhost:8084/1 GET /tracking]]
+note right
+Запрос состояния заказа:
+- orderId = 1
+Но статус доставки не обновляется
+(нет интеграции, будет добавлена в задании 1)
+end note
+Tracking -> Ordering: Запрос статуса заказа
+Ordering -> Tracking: { "status": "CONFIRMED" }
+Tracking -> Payment: Запрос статуса оплаты
+Payment -> Tracking: { "status": "PAID" }
+Tracking -> Shipping: Запрос статуса доставки
+Shipping -> Tracking: { "status": "UNKNOWN" }
+Tracking -> User: { "orderStatus": "CONFIRMED", "paymentStatus": "PAID", "shippingStatus": "UNKNOWN" }
+
+...Ждём 60 секунд...
+
+User -> Shipping: [[http://localhost:8087/shipping/1/status GET /shipping/status]]
+note right
+Статус доставки обновился:
+- orderId = 1
+Теперь "IN_DELIVERY"
+end note
+Shipping -> User: "IN_DELIVERY"
+
+== Получение счёта-фактуры ==
+User -> Invoice: GET http://localhost:8083/invoices/byOrder/1
+note right
+Запрос счёта по заказу:
+- orderId = 1
+
+Счет-фактура автоматически генерируется
+только при запущенной Kafka и
+    app.disable-message-publishing=false
+в ordering-service
+end note
+Invoice -> User: { "invoice details" }
+
+@enduml

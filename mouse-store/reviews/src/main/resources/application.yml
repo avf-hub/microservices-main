@@ -1,0 +1,8 @@
+spring:
+  application:
+    name: mouse-reviews
+  jackson:
+    default-property-inclusion: non_null
+
+server:
+  port: 8081

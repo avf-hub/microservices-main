@@ -1,0 +1,16 @@
+version: "3.8"
+name: mouse-app
+services:
+  mouse-catalog:
+    image: mouse-catalog:v1
+    environment:
+      JAVA_OPTIONS: -Xms15m -Xmx15m -Xmn15m
+      SPRING_PROFILES_ACTIVE: docker
+    ports:
+      - "8080:8080"
+  mouse-reviews:
+    image: mouse-reviews:v1
+    environment:
+      JAVA_OPTIONS: -Xms15m -Xmx15m -Xmn15m
+      SPRING_PROFILES_ACTIVE: docker
+    # notice no way to reach mouse-reviews directly!

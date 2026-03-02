@@ -1,0 +1,78 @@
+plugins {
+    id 'training.java'
+    id 'org.springframework.boot'
+    id 'com.google.cloud.tools.jib'
+}
+
+dependencies {
+    implementation "org.mapstruct:mapstruct:1.5.5.Final"
+    implementation 'org.projectlombok:lombok-mapstruct-binding:0.2.0'
+    annotationProcessor "org.mapstruct:mapstruct-processor:1.5.5.Final"
+    annotationProcessor 'org.hibernate.orm:hibernate-jpamodelgen:6.3.0.Final'
+
+    implementation 'net.datafaker:datafaker:2.0.1'
+    implementation 'org.springframework.boot:spring-boot-starter-json'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+
+    annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            artifact bootJar
+        }
+    }
+}
+
+bootJar {
+    enabled = false
+}
+
+
+tasks.named("bootBuildImage") {
+    publish = true
+    docker {
+        publishRegistry {
+            username = "admin"
+            password = "admin123"
+            url = "https://nexus.dev.local:9200/v2/"
+        }
+        imageName = "nexus.dev.local:9200/${project.name}:${project.version}"
+    }
+}
+
+jib {
+    allowInsecureRegistries = true
+
+
+    from {
+        image = 'openjdk:17-jdk-slim'
+        auth {
+            username = DOCKER_HUB_USERNAME
+            password = DOCKER_HUB_PASSWORD
+        }
+        platforms {
+            platform {
+                architecture = DOCKER_PLATFORM
+                os = 'linux'
+            }
+        }
+    }
+    container {
+        ports = ['8080']
+    }
+
+    to {
+        image = "nexus.dev.local:9200/${project.name}:${project.version}"
+
+        auth {
+            username = 'admin'
+            password = 'admin123'
+        }
+    }
+}
+
+jib.container.creationTime.set('USE_CURRENT_TIMESTAMP')

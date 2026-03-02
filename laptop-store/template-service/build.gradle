@@ -1,0 +1,16 @@
+plugins {
+    id 'training.laptop-store-service'
+}
+
+/*
+    This template project provides a mechanism for the quick creation of a new service from scratch using
+    "Service Template Patterns", described by Microservices Patterns (Richardson, 2018).
+
+    A template is a simple runnable service that implements the required build logic and cross-cutting concerns
+    along with sample application logic.
+ */
+
+dependencies {
+    implementation project(':laptop-store-common-config')
+    implementation project(':laptop-store-template-shared-model')
+}

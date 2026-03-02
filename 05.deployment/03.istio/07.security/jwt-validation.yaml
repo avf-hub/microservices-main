@@ -1,0 +1,24 @@
+# The following policy enforces mandatory JWT validation in addition to the request authentication policy.
+# This example denies the request to the /reviews path for requests without request principals
+
+# The policy denies the request if the request principal is empty.
+# The request principal will be empty if JWT validation failed.
+# In other words, the policy allows requests if the request principal is non-empty.
+# "*" means non-empty match and using with notRequestPrincipals means matching on empty request principal.
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: "frontend-ingress"
+  namespace: istio-system
+spec:
+  selector:
+    matchLabels:
+      istio: ingressgateway
+  action: DENY
+  rules:
+    - to:
+        - operation:
+            paths: [ "/*" ]
+      from:
+        - source:
+            notRequestPrincipals: [ "*" ]

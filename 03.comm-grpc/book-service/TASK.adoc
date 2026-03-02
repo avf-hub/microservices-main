@@ -1,0 +1,114 @@
+= TASK: Implement possibility to add a book
+
+=== Here we demonstrate how to add feature of adding new book to the DB
+
+1) Update book.proto:
+
+First, you need to extend your book.proto file to include a new message for creating a book.
+Add the following message definition to your .proto file:
+
+[source,protobuf]
+----
+syntax = "proto3";
+
+message CreateBookRequest {
+    string title = 1;
+    string author = 2;
+}
+
+message CreateBookResponse {
+    int64 id = 1;
+}
+service BookService {
+  // ... your existing RPC definitions ...
+
+  rpc createBook(CreateBookRequest) returns (CreateBookResponse) {};
+}
+----
+
+2) Execute `./gradlew build` to generate a stub for GRPC
+
+3) Implement createBook method in GrpcBookService:
+
+[source,java]
+----
+@Override
+public void createBook(BookOuterClass.CreateBookRequest request,
+		 StreamObserver<BookOuterClass.CreateBookResponse> responseObserver) {
+	Book savedBook = bookService.createBook(request.getTitle(), request.getAuthor());
+	// Send the response with the ID of the newly created book
+	BookOuterClass.CreateBookResponse response = BookOuterClass.CreateBookResponse.newBuilder()
+			.setId(savedBook.getId())
+			.build();
+
+	responseObserver.onNext(response);
+	responseObserver.onCompleted();
+}
+----
+
+4) Implement the service by adding the method:
+
+[source,java]
+----
+public interface BookService {
+	Book createBook(String title, String author); // +++
+}
+----
+
+[source,java]
+----
+public class BookServiceImpl implements BookService {
+	@Override
+	public Book createBook(String title, String author) {
+		Book book = new Book();
+		book.setTitle(title);
+		book.setAuthor(author);
+		return bookRepository.save(book);
+	}
+}
+----
+
+5) Restart the application and test the new endpoint (add to requests.rest):
+
+NB! In IDEA to run this commands, you should turn off automatic configuration:
+
+1) Open the IDEA settings
+
+2) Go to the Languages & Frameworks -> Protocol Buffers
+
+3) Uncheck the "Auto-configuration options"
+
+[source,httprequest]
+----
+### Create a book
+
+GRPC localhost:6565/com.bookstore.BookService/createBook
+
+{
+   "title": "New GRPC book",
+   "author": "Vladimir Katunov"
+}
+
+### Find a created book by Id
+
+GRPC localhost:6565/com.bookstore.BookService/findById
+
+{
+   "id": 1001
+}
+----
+
+Otherwise, you can use CLI:
+
+[source,shell]
+----
+grpc_cli call localhost:6565 com.bookstore.BookService.createBook "title: 'New GRPC book' author: 'Vladimir Katunov'"
+----
+
+And to check the added book:
+
+[source,shell]
+----
+grpc_cli call localhost:6565 com.bookstore.BookService.findById "id: 1001"
+----
+

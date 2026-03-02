@@ -1,0 +1,29 @@
+spring:
+  application:
+    name: Subscriber
+  cloud:
+    stream:
+      bindings:
+        process-in-0:
+          destination: wordStreamErrors
+          group: group-errors
+
+
+          consumer:
+            back-off-initial-interval: 1000
+            back-off-max-interval: 100000
+            back-off-multiplier: 2
+            max-attempts: 10
+            default-retryable: true
+            retryable-exceptions:
+              java.lang.RuntimeException: true
+      kafka:
+        bindings:
+          process-in-0:
+            consumer:
+              ack-mode: manual
+              enable-dlq: true
+              dlq-name: wordStreamErrorsDLQ
+
+server:
+  port: 0

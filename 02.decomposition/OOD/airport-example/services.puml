@@ -1,0 +1,33 @@
+@startuml
+
+package "FlightTimetableService" {
+  class Flight {
+    +FlightStatus status
+  }
+  Flight --> FlightStatus : has
+  Flight : +getFlightInformation()
+}
+
+package "TicketReservationService" {
+  class Ticket {
+    +ClientInformation clientInfo
+  }
+  Ticket --> ClientInformation : has
+  Ticket : +buyTicket()
+}
+
+package "TicketService" {
+  class Ticket {
+    +TicketInformation ticketInfo
+    checkIn(): CheckedInTicket
+  }
+Ticket -> TicketInformation : has
+  class CheckedInTicket {
+    +Baggage baggage
+    +BoardingPass boardingPass
+  }
+  CheckedInTicket -up-|> Ticket
+  CheckedInTicket : +checkin()
+}
+
+@enduml

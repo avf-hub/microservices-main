@@ -1,0 +1,51 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: mouse-catalog-vs
+spec:
+  hosts:
+    - "*"
+  http:
+    - match:
+        - uri:
+            prefix: /mice/
+        - uri:
+            prefix: /mice
+      rewrite:
+        uri: "/"
+      route:
+        - destination:
+            host: mouse-catalog
+            subset: v1
+          weight: 80
+        - destination:
+            host: mouse-catalog
+            subset: v2
+          weight: 20
+  gateways:
+    - mouse-gateway
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: mouse-reviews-vs
+spec:
+  gateways:
+    - mesh
+  hosts:
+    - "mouse-reviews"
+  http:
+    - match:
+        - sourceLabels:
+            version: v1
+      route:
+        - destination:
+            host: mouse-reviews
+            subset: v1
+    - match:
+        - sourceLabels:
+            version: v2
+      route:
+        - destination:
+            host: mouse-reviews
+            subset: v2

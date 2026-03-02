@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.1.xsd">
+
+    <!-- TODO: Define ChangeSet ID naming convention -->
+    <changeSet id="create-laptops-table" author="alex-v-yakunin"
+               context="catalog">
+        <createTable tableName="laptops">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false" unique="true"/>
+            </column>
+            <column name="model" type="varchar(255)"/>
+            <column name="manufacturer" type="varchar(255)"/>
+            <column name="screen_size" type="int"/>
+            <column name="screen_resolution" type="varchar(255)"/>
+            <column name="ram_capacity" type="int"/>
+            <column name="processor_line" type="varchar(255)"/>
+            <column name="processor_core_count" type="int"/>
+            <column name="storage_type" type="varchar(255)"/>
+            <column name="drive_capacity" type="int"/>
+            <column name="os" type="varchar(128)"/>
+        </createTable>
+    </changeSet>
+</databaseChangeLog>

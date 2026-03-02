@@ -1,0 +1,134 @@
+= Kubernetes + Istio setup
+:source-highlighter: highlight.js
+:icons: font
+
+== Prerequisites
+
+Your user needs to have local administrator rights.
+
+== Containers
+
+Get Podman from https://podman.io/
+
+You can also use Docker but only if you are assigned a commercial license.
+
+https://docs.docker.com/desktop/install/windows-install/
+https://docs.docker.com/desktop/install/mac-install/
+
+== Kubernetes
+
+Install minikube using any method outlined in the "Get Started" section of minikube docs.
+
+https://minikube.sigs.k8s.io/docs/start/
+
+One of the easiest methods on Windows is using _Chocolatey Package Manager_: https://chocolatey.org/install
+
+Install required packages (in elevated shell):
+
+[source,shell]
+.for Windows
+----
+choco install minikube kubernetes-cli
+----
+
+[source,shell]
+.for Mac
+----
+brew install minikube kubernetes-cli
+----
+
+Follow additional steps for minikube on Windows: https://minikube.sigs.k8s.io/docs/drivers/hyperv/
+
+== Istio
+
+You will find latest Istio release link on https://istio.io/latest/docs/setup/getting-started/
+
+At the time of writing this guide the current Istio version is `1.22.3`:
+
+https://github.com/istio/istio/releases/tag/1.22.3
+
+Make sure you download a proper version for your OS and CPU architecture.
+
+WARNING: You need full Istio, not Istioctl!
+
+== Configuration
+
+* Make sure you are running JDK 17.
+
+* Set `ISTIO_HOME` environment variable to unpacked Istio distribution
++
+It's easy to do on Windows with a command like:
++
+[source,shell]
+----
+setx ISTIO_HOME c:\devtools\istio-1.22.3
+----
+
+* add `$ISTIO_HOME/bin` to your `$PATH`
+
+* Set `DOCKER_HUB_USERNAME` and `DOCKER_HUB_PASSWORD` variables in gradle.properties.
++
+Anonymous Docker Hub access does not work Jib.
+Jib is the the library to build Docker images fast without using Docker runtime.
+
+== Starting a cluster
+
+.Cluster creation
+[source,shell]
+.setup istio location
+----
+export ISTIO_HOME=/my-istio-folder
+----
+
+* put $ISTIO_HOME/bin on PATH
+
+[source,shell]
+.create cluster from script in `infra/kubernetes` folder
+----
+./infra/istio/cluster-start.sh
+----
+should take no more than 90s
+
+RUN IN ELEVATED SHELL OR SUDO!
+
+
+
+[source,shell]
+.build docker images for book-service and book-reviews directly into k8s registry
+----
+./build-mouse-store-images-to-k8s.sh
+----
+
+* switch back to default docker context before
+** starting up the dashboard
+** opening a tunnel
+** getting service url
+
+[source,shell]
+----
+docker context use default
+----
+
+keep terminal open
+
+[source,shell]
+----
+minikube dashboard
+----
+
+run in separate terminal, keep open
+
+[source,shell]
+----
+minikube tunnel
+----
+
+now you can deploy test applications to minikube
+
+== Clean up
+
+[source,shell]
+.Cluster tear down
+----
+./infra/istio/cluster-destroy.sh
+----

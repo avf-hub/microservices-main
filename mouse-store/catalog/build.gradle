@@ -1,0 +1,19 @@
+plugins {
+    id 'training.boot-app'
+}
+
+group = 'training.mousestore'
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.cloud:spring-cloud-starter-openfeign'
+    implementation 'org.springframework.cloud:spring-cloud-starter-loadbalancer'
+
+    runtimeOnly 'com.h2database:h2'
+    implementation('com.opencsv:opencsv:5.7.1') {
+        exclude group: "commons-logging", module: "commons-logging"
+    }
+}
+
+jib.to.image = "mouse-catalog:v1"

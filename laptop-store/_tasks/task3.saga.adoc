@@ -1,0 +1,181 @@
+:toc:
+:toclevels: 2
+
+= Задание 3. Паттерн SAGA
+
+== Задача: автоматизация возврата денег при отмене доставки
+
+Доставка может быть **отменена**. В этом случае **деньги должны быть возвращены покупателю**.
+
+Для реализации возврата мы будем использовать **паттерн SAGA**. Этот паттерн гарантирует, что при отмене доставки **автоматически выполняются компенсационные действия**. Например, если доставка отменяется, **деньги возвращаются покупателю**.
+
+=== В Задании 2 мы реализовали автоматический запуск доставки после оплаты заказа:
+
+**makePayment(orderId)** → *Payment Service* → (отправка сообщения в `paid-orders`) → *Shipping Service* → **startShipping(orderId)**
+
+[plantuml,plantuml-diagram,svg]
+----
+@startuml
+autonumber
+actor User
+participant "Payment Service" as PaymentService
+queue "Kafka Topic:\n paid-orders" as Kafka
+participant "Shipping Service" as ShippingService
+
+User -> PaymentService: makePayment(orderId)
+PaymentService -> Kafka: send(orderId)
+Kafka -> ShippingService: received(orderId)
+ShippingService -> ShippingService: startShipping(orderId)
+
+@enduml
+----
+
+=== Теперь мы должны добавить возможность **отмены доставки** и **возврата денег**.
+
+**clearShipping(orderId)** → *Shipping Service* → **cancelShipping(orderId)** → (отправка сообщения в `cancelled-orders`) →
+*Payment Service* → **refundPayment(orderId)**
+
+[plantuml,plantuml-diagram,svg]
+----
+@startuml
+autonumber
+
+actor User
+participant "Shipping Service" as ShippingService
+queue "Kafka Topic:\n cancelled-orders" as CancelledOrders
+participant "Payment Service" as PaymentService
+
+User -> ShippingService: clearShipping(orderId)
+ShippingService -> CancelledOrders: send(orderId)
+CancelledOrders -> PaymentService: received(orderId)
+PaymentService -> PaymentService: refundPayment(orderId)
+
+@enduml
+----
+
+Здесь **`clearShipping(orderId)`** – это метод, который **отменяет доставку**. После этого **отправляется сообщение в топик `cancelled-orders`**. **`Payment Service`** получает это сообщение и **возвращает деньги**.
+
+== Реализация
+
+Сначала **обновим `Payment Service`**, добавив в него возможность возврата денег.
+
+### Добавление метода возврата денег в `PaymentService`
+
+В классе `PaymentService` добавьте следующий метод:
+
+[source,java]
+----
+@Bean
+public Consumer<Long> revertPayment() {
+    return orderId -> {
+       Optional<Payment> paymentOptional =
+           paymentRepository.findByOrderId(orderId);
+       Payment payment;
+       if (paymentOptional.isPresent()) {
+          payment = paymentOptional.get();
+          if (PaymentStatus.IN_PROCESS == payment.getPaymentStatus()) {
+             payment.setPaymentStatus(PaymentStatus.CANCELLED);
+             paymentRepository.save(payment);
+          } else if (PaymentStatus.PAID == payment.getPaymentStatus()) {
+             payment.setPaymentStatus(PaymentStatus.CANCELLED);
+             paymentRepository.save(payment);
+             moneyBack(payment);
+          }
+       }
+    };
+}
+
+public void moneyBack(Payment payment) {
+    System.out.println("Возврат средств за оплату "+payment.getId()+
+          " клиенту "+payment.getCustomerId()+": "+
+          "$"+payment.getPaymentCost()+" компенсировано");
+}
+----
+
+Теперь **`Payment Service` должен "слушать" топик `cancelled-orders`**.
+Если заказ **отменяется**, сервис автоматически выполнит возврат денег.
+
+Добавьте эту конфигурацию в `application.yaml`:
+
+[source,yaml]
+----
+spring:
+  cloud:
+    stream:
+      bindings:
+        revertPayment-in-0:
+          destination: cancelled-orders
+          group: payment
+----
+
+### Обновление `PaymentStatus`: добавление нового статуса `CANCELLED`
+
+В `PaymentStatus` добавьте новый статус **CANCELLED**:
+
+[source,java]
+----
+public enum PaymentStatus {
+    UNPAID, IN_PROCESS, PAID, CANCELLED
+}
+----
+
+Этот статус будет означать, что **оплата была отменена, а деньги возвращены покупателю**.
+
+### Изменение метода `clearShipping()` в `ShippingService`
+
+В текущей реализации **`clearShipping()` просто удаляет запись о доставке из базы данных**.
+Мы должны **модифицировать его**, чтобы он отправлял сообщение об **отменённом заказе**.
+
+[source,java]
+----
+public boolean clearShipping(Long orderId) {
+    Optional<Shipping> shippingOptional =
+       shippingRepository.findByOrderId(orderId);
+    Shipping shipping;
+    if (shippingOptional.isPresent()) {
+       shipping = shippingOptional.get();
+       if (ShippingStatus.IN_DELIVERY == shipping.getShippingStatus()) {
+          cancelShipping(orderId);			// +++
+          shippingRepository.delete(shipping);
+          return true;
+       } else if (ShippingStatus.DELIVERED == shipping.getShippingStatus()) {
+          throw new ShippingValidationException(
+             "Заказ уже был доставлен",
+             shipping.getId()
+          );
+       } else if (ShippingStatus.UNKNOWN == shipping.getShippingStatus()) {
+          throw new ShippingValidationException(
+             "Заказ не находится в процессе доставки",
+             shipping.getId()
+          );
+       }
+    } else {
+       throw new ShippingValidationException(
+             "Информация о доставке для заказа не найдена",
+             orderId
+       );
+    }
+    return false;
+}
+
+private void cancelShipping(Long orderId) {		// +++
+    streamBridge.send("cancelled-orders", orderId);	// +++
+}							  // +++
+----
+
+Теперь **при отмене доставки в `Shipping Service`** сообщение о событии будет **отправлено в `cancelled-orders`**.
+`Payment Service` получит это сообщение и **автоматически выполнит возврат денег**.
+
+== Тестирование
+
+Для проверки работы используйте HTTP-запросы из `_http/saga.http`.
+
+**Важно**: перед тестированием **перезапустите `Shipping Service` и `Payment Service`**, чтобы новые изменения вступили в силу.
+
+После отмены доставки **проверьте логи `Payment Service`** – там должно появиться сообщение о возврате денег.
+
+Теперь возврат платежа **полностью автоматизирован**!
+
+=== Поздравляем! Задание выполнено! 🎉
+
+SAGA **обеспечивает согласованность системы**: если доставка отменена → деньги автоматически возвращаются покупателю.

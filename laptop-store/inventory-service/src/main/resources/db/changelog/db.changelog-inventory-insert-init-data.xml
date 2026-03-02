@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.1.xsd">
+
+    <changeSet id="insert-inventory_items-init-data" author="alex-v-yakunin" context="inventory">
+        <!-- 1  MacBook Pro Apple   13' 2560x1600   8GB M1  8C  SSD 256GB   macOS -->
+        <insert tableName="inventory_items">
+            <column name="product_id" value="1"/>
+            <column name="available_qty" value="10"/>
+            <column name="unit_cost" value="1300"/>
+        </insert>
+        <!-- 2  MacBook Pro Apple   16' 3072x1920   16GB    Intel Core i7   8C  SSD 512GB   macOS -->
+        <insert tableName="inventory_items">
+            <column name="product_id" value="2"/>
+            <column name="available_qty" value="3"/>
+            <column name="unit_cost" value="2700"/>
+        </insert>
+        <!-- 3	ProBook	HP	13'	1920x1080	8GB	Intel Core i3	2C	SSD	256GB	Windows 10 Pro -->
+        <insert tableName="inventory_items">
+            <column name="product_id" value="3"/>
+            <column name="available_qty" value="30"/>
+            <column name="unit_cost" value="560"/>
+        </insert>
+        <!-- 4	Latitude	Dell	15'	1920x1080	8GB	Intel Core i5	4C	SSD	256GB	Windows 10 Pro -->
+        <insert tableName="inventory_items">
+            <column name="product_id" value="4"/>
+            <column name="available_qty" value="20"/>
+            <column name="unit_cost" value="640"/>
+        </insert>
+        <!-- 5	ThinkPad	Lenovo	15'	1920x1080	8GB	Intel Core i5	4C	SSD	512GB	null -->
+        <insert tableName="inventory_items">
+            <column name="product_id" value="5"/>
+            <column name="available_qty" value="10"/>
+            <column name="unit_cost" value="850"/>
+        </insert>
+        <!-- 6	ThinkPad	Lenovo	15'	1920x1080	8GB	AMD Ryzen 3	4C	SSD	256GB	Windows 11 Pro -->
+        <insert tableName="inventory_items">
+            <column name="product_id" value="6"/>
+            <column name="available_qty" value="10"/>
+            <column name="unit_cost" value="920"/>
+        </insert>
+    </changeSet>
+</databaseChangeLog>

@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mouse-catalog-2
+  labels:
+    app: mouse-catalog
+    version: v2
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mouse-catalog
+      version: v2
+  template:
+    metadata:
+      labels:
+        app: mouse-catalog
+        version: v2
+    spec:
+      containers:
+        - name: mouse-catalog
+          image: mouse-catalog:v1
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          env:
+            - name: JAVA_OPTIONS
+              value: -Xms15m -Xmx15m -Xmn15m
+            - name: SPRING_PROFILES_ACTIVE
+              value: k8s, v2

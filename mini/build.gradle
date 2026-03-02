@@ -1,0 +1,16 @@
+plugins {
+    id 'training.boot-app'
+}
+
+group = 'training.jva083.mini'
+
+jib.to {
+    image = "mini:v1"
+}
+
+jib.container.creationTime.set('USE_CURRENT_TIMESTAMP')
+
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+}

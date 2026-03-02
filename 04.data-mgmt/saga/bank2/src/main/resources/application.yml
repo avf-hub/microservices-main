@@ -1,0 +1,13 @@
+spring:
+  cloud:
+    stream:
+      bindings:
+        process-in-0:
+          destination: transferRequests
+        process-out-0:
+          destination: transferResults
+
+bank:
+  name: BANK2
+server:
+  port: 9182

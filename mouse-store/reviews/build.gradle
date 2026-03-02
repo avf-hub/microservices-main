@@ -1,0 +1,14 @@
+plugins {
+    id 'training.boot-app'
+}
+
+group = 'training.mousestore'
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    runtimeOnly 'com.h2database:h2'
+}
+
+jib.to.image = "mouse-reviews:v1"
+jib.container.ports = ["8081"]

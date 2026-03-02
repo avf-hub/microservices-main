@@ -1,0 +1,47 @@
+{
+  "groups": [
+    {
+      "name": "laptop-common-config",
+      "type": "store.laptop.commons.config.LaptopCommonProperties",
+      "sourceType": "store.laptop.commons.config.LaptopCommonProperties"
+    }
+  ],
+  "properties": [
+    {
+      "name": "laptop-common-config.services",
+      "type": "java.util.Map<java.lang.String,store.laptop.commons.config.services.ServiceProperties>",
+      "sourceType": "store.laptop.commons.config.LaptopCommonProperties"
+    }
+  ],
+  "hints": [
+    {
+      "name": "laptop-common-config.services.keys",
+      "values": [
+        {
+          "value": "catalog-service"
+        },
+        {
+          "value": "inventory-service"
+        },
+        {
+          "value": "invoicing-service"
+        },
+        {
+          "value": "order-tracking-service"
+        },
+        {
+          "value": "ordering-service"
+        },
+        {
+          "value": "payment-service"
+        },
+        {
+          "value": "shipping-service"
+        },
+        {
+          "value": "shopping-cart-service"
+        }
+      ]
+    }
+  ]
+}

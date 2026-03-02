@@ -1,0 +1,48 @@
+@startuml
+title Event Storming - Laptop Online Store
+
+=== Каталог товаров ===
+actor Клиент
+participant "Каталог товаров" as Catalog
+Catalog -> Catalog : ProductCatalogUpdated
+Клиент -> Catalog : ProductViewed
+Клиент -> Catalog : ProductFiltered
+
+=== Корзина ===
+participant "Корзина" as Cart
+Клиент -> Cart : ItemAddedToCart
+Клиент -> Cart : ItemRemovedFromCart
+Клиент -> Cart : CartCheckedOut
+
+=== Оформление заказа ===
+participant "Система заказов" as Ordering
+Cart -> Ordering : OrderPlaced
+Ordering -> Ordering : OrderValidated
+Ordering -> Inventory : StockChecked
+Inventory -> Ordering : StockReserved
+Ordering -> Ordering : OrderConfirmed
+
+=== Оплата ===
+participant "Платёжный сервис" as Payment
+Ordering -> Payment : PaymentInitiated
+Payment -> Payment : PaymentProcessed
+Payment -> Ordering : PaymentFailed
+
+=== Выставление счёта ===
+participant "Сервис счетов" as Invoicing
+Payment -> Invoicing : InvoiceCreated
+Invoicing -> Invoicing : InvoiceSent
+
+=== Доставка ===
+participant "Сервис доставки" as Shipping
+Ordering -> Shipping : ShipmentCreated
+Shipping -> Shipping : ShipmentDispatched
+Shipping -> Tracking : ShippingStatusUpdated
+
+=== Отслеживание заказа ===
+participant "Сервис отслеживания заказов" as Tracking
+Ordering -> Tracking : OrderStatusUpdated
+Shipping -> Tracking : ShippingStatusUpdated
+Tracking -> Клиент : OrderDelivered
+
+@enduml

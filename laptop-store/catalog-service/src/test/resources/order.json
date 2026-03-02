@@ -1,0 +1,15 @@
+{
+  "customerId": 1,
+  "items": [
+    {
+      "productId": 1,
+      "cost": 3500,
+      "qty": 1
+    },
+    {
+      "productId": 2,
+      "cost": 2700,
+      "qty": 2
+    }
+  ]
+}

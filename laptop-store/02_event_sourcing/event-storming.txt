@@ -1,0 +1,70 @@
+-----------------
+Event Storming
+-----------------
+
+Event Storming — это метод совместного моделирования системы через события. Он позволяет быстро выявить все важные бизнес-события, участников процессов и связи между ними.
+
+Принципы Event Storming
+	1.	Фокус на событиях: Выявляются ключевые события (например, «Заказ создан», «Оплата подтверждена»).
+	2.	Работа в группах: Участвуют бизнес-эксперты, архитекторы, разработчики.
+	3.	Использование стикеров: Каждое событие, команда, объект отмечаются цветными стикерами на доске (или в онлайн-инструментах).
+	4.	Быстрое выявление ограниченных контекстов (bounded contexts): Видно, где один процесс заканчивается и начинается другой.
+
+---------------------------------------
+Пример Event Storming
+---------------------------------------
+
+Моделируем процесс оформления заказа:
+	1.	Клиент добавляет товар в корзину → ItemAddedToCart
+	2.	Клиент оформляет заказ → OrderPlaced
+	3.	Система проверяет наличие товара → StockChecked
+	4.	Резервируется товар на складе → StockReserved
+	5.	Клиент оплачивает заказ → PaymentProcessed
+	6.	Заказ подтверждён → OrderConfirmed
+	7.	Отгрузка оформлена → ShipmentCreated
+	8.	Доставка выполнена → OrderDelivered
+
+Эти события помогают выявить bounded contexts:
+	•	Корзина (Shopping Cart) → ItemAddedToCart
+	•	Заказы (Ordering) → OrderPlaced, OrderConfirmed
+	•	Склад (Inventory) → StockChecked, StockReserved
+	•	Оплата (Payment) → PaymentProcessed
+	•	Доставка (Shipping) → ShipmentCreated, OrderDelivered
+
+---------------------------------------
+Основные события в процессе оформления заказа
+	1.	Просмотр каталога
+	•	ProductCatalogUpdated
+	•	ProductViewed
+	•	ProductFiltered
+	2.	Управление корзиной
+	•	ItemAddedToCart
+	•	ItemRemovedFromCart
+	•	CartCheckedOut
+	3.	Оформление заказа
+	•	OrderPlaced
+	•	OrderValidated
+	•	StockChecked
+	•	StockReserved
+	•	OrderConfirmed
+	4.	Оплата заказа
+	•	PaymentInitiated
+	•	PaymentProcessed
+	•	PaymentFailed
+	5.	Выставление счёта
+	•	InvoiceCreated
+	•	InvoiceSent
+	6.	Доставка
+	•	ShipmentCreated
+	•	ShipmentDispatched
+	•	OrderDelivered
+	7.	Отслеживание заказов
+	•	OrderStatusUpdated
+	•	ShippingStatusUpdated
+
+Преимущества Event Storming:
+1.	Event Storming позволяет легко выявить bounded contexts → каждый сервис работает со своими событиями.
+2.	Определены границы ответственности сервисов → заказы, склад, оплата, доставка — всё разделено.
+3.	События помогают понять последовательность действий и взаимосвязи между сервисами.
+4.	События — это ключевые моменты, которые могут быть использованы для аналитики, мониторинга и отладки.
+

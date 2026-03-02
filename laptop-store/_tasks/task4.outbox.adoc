@@ -1,0 +1,311 @@
+:toc:
+:toclevels: 2
+
+= Задание 4. Паттерн Outbox
+
+== Задача: гарантированная отправка сообщений в Kafka
+
+В **распределённых системах** важно, чтобы **сообщения отправлялись ровно один раз**.
+Паттерн **Outbox** решает эту проблему, гарантируя, что сообщения:
+
+- **Сохраняются в базе данных** перед отправкой.
+- **Отправляются в Kafka через специальный процессор**.
+- **Не дублируются** (даже при сбоях).
+
+В этом задании **мы реализуем Outbox в `laptop-store`**, чтобы надёжно отправлять сообщения о заказах.
+
+== Текущая проблема
+
+Сейчас в `OrderController` происходит **две операции одновременно**:
+
+1. **Обновление заказа в БД** (`PLACED`).
+2. **Публикация сообщения** для других сервисов.
+
+Вот текущий код:
+
+[source,java]
+----
+@Override
+public OrderInfo placeOrder(PlaceOrderRequest orderRequest) {
+    Order order = processingService.placeOrder(orderRequest);
+    orderMessagingPublisher.publish(orderDataMapper.map(order)); // УДАЛЯЕМ ЭТУ СТРОКУ
+    return orderInfoMapper.map(order);
+}
+----
+
+🔹 **Проблема**: если вторая операция (публикация сообщения) **не удастся**, другие сервисы **не узнают о заказе**, ведь сообщение просто пропадёт.
+
+Решение — **сначала записать сообщение в Outbox (БД), а затем отправить его в Kafka**.
+
+== Решение: Outbox pattern
+Для реализации Outbox pattern в `Ordering Service` нужно выполнить два шага:
+
+1. **Сначала сохраняем сообщение в БД - в той же транзакции, что и заказ**:
++
+Сначала сохраняем сообщение в таблицу `outbox_messages` в БД.
++
+Это гарантирует, что сообщение не потеряется - просто *будет отправлено позже*.
++
+[plantuml]
+----
+@startuml
+autonumber
+
+actor User
+participant "OrderController" as OrderController
+participant "OrderProcessingService" as OrderProcessingService
+database "Order Table" as Order
+database "Outbox Table" as Outbox
+
+User -> OrderController: placeOrder(orderRequest)
+OrderController -> OrderProcessingService: process order
+group Транзакция (атомарная операция)
+    OrderProcessingService -> Order: save order (PLACED)
+    OrderProcessingService -> Outbox: save event (new order)
+end
+OrderProcessingService -> OrderController: return order info
+
+@enduml
+----
++
+*Что здесь важно?*
++
+- Выполняем в *одной локальной транзакции*, а значит *надежно* (либо оба действия выполнены, либо ни одного):
++
+1) Сначала заказ сохраняется в таблице Order → Это гарантирует, что он обновлен в локальной БД.
++
+2) Затем создаётся запись в таблицу Outbox → Это гарантирует, что сообщение не потеряется.
++
+- Сообщение пока *НЕ отправляется в Kafka!* Оно будет прочитано позже из таблицы Outbox и отправлено в Kafka.
+
+2. *Каждые 3 секунды пытаемся отправить сообщения, ждущие в Outbox, и ждем, когда Kafka оживёт и подтвердит получение:*
++
+Периодический процесс (планировщик) проверяет таблицу `outbox_messages` и отправляет сообщения в Kafka. Если отправка прошла успешно, сообщение помечается как отправленное (`sent=true`).
++
+[plantuml]
+----
+@startuml
+autonumber
+
+participant "Outbox Service" as OutboxService
+database "Outbox Table" as Outbox
+queue "Kafka Topic:\n orders" as Kafka
+
+loop Каждые 3 секунды (Spring Scheduler)
+    OutboxService -> Outbox: найти неотправленные сообщения
+    Outbox -> OutboxService: return messages
+
+    group Обработка сообщений
+        OutboxService -> Kafka: send event (order placed)
+        Kafka -> Kafka: получить и\n сохранить сообщение\n (дальше Кафка \n гарантирует доставку)
+        OutboxService -> Outbox: отметить сообщение как **отправленное**\n (sent=true)
+    end
+end
+
+@enduml
+----
++
+*Что здесь важно?*
++
+- **Spring Scheduler** каждые 3 секунды проверяет таблицу Outbox.
+- Он отправляет сообщения в Kafka.
+- Если отправка успешна, сообщение помечается как `sent=true`.
+- Если Kafka недоступна, сообщение останется в таблице и будет отправлено при следующем запуске.
++
+*Это гарантирует, что ни одно сообщение не потеряется!*
+
+== Реализация
+
+Для реализации Outbox pattern в `Ordering Service` выполним следующие шаги:
+
+- Добавим таблицу `outbox_messages` в `Ordering Service`.
+- Создадим сущность и репозиторий для Outbox.
+- Изменим `OrderProcessingService`: теперь сообщения сохраняются в Outbox.
+- Настроим процессор Outbox, который будет отправлять сообщения в Kafka.
+
+=== Шаг 1. Добавление таблицы Outbox
+
+Добавим таблицу `outbox_messages` в `Ordering Service`.
+Файл: `resources/db/changelog/db.changelog-ordering-create-tables.xml`
+
+[source,xml]
+----
+<createTable tableName="outbox_messages">
+    <column name="id" type="bigint" autoIncrement="true">
+        <constraints primaryKey="true"
+                     nullable="false"
+                     unique="true"/>
+    </column>
+    <column name="message" type="varchar(300)"/>
+    <column name="sent" type="boolean"/>
+    <column name="date" type="datetime"/>
+</createTable>
+----
+
+🔹 **Теперь сообщения сначала записываются в БД**, а затем отправляются в Kafka.
+
+
+=== Шаг 2. Создание сущности и репозитория для Outbox
+
+В папке `domain/model` создадим **сущность OutboxMessage**:
+
+[source,java]
+----
+@Entity
+@Data
+@Table(name = "outbox_messages")
+public class OutboxMessage {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    // Данные события (JSON)
+    private String message;
+
+    private Boolean sent = false;
+    private Date date;
+}
+
+public interface OutboxMessageRepository
+        extends JpaRepository<OutboxMessage, Long> {
+    List<OutboxMessage> findAllBySentIsFalseOrderByDate();
+}
+----
+
+🔹 Теперь сообщения **сначала записываются в БД**, а потом **отправляются в Kafka** через процессор.
+
+
+=== Шаг 3. Изменение `OrderProcessingService`: сохранение сообщений в Outbox
+
+Теперь **мы не будем отправлять сообщения сразу**.
+Вместо этого **они сначала записываются в Outbox**, а затем **обрабатываются отдельно**.
+
+[source,java]
+----
+@Transactional
+public Order placeOrder(Order newOrder) {
+    newOrder.setOrderState(OrderState.PLACED);
+    Order order = orderRepository.save(newOrder);
+
+    try {
+       OutboxMessage outboxMessage = new OutboxMessage();
+       String orderDataJson = mapper.writeValueAsString(
+              orderDataMapper.map(order));
+       outboxMessage.setMessage(orderDataJson);
+       outboxMessageRepository.save(outboxMessage);
+    } catch (JsonProcessingException e) {
+       throw new RuntimeException(e);
+    }
+
+    return order;
+}
+----
+
+=== Как это работает?
+
+- **Обновление заказа в БД и сохранение сообщения теперь атомарны.**
+- **Если что-то пойдёт не так, ни одна из операций не выполнится.**
+- **Сообщение будет обработано позже процессором Outbox.**
+
+
+=== Шаг 4. Настройка процессора Outbox
+
+Теперь **нам нужен процесс, который будет периодически забирать сообщения из Outbox и отправлять их в Kafka**.
+
+==== 1) Включение планировщика
+
+Добавьте `@EnableScheduling` в `OrderingServiceApplication`:
+
+[source,java]
+----
+@SpringBootApplication
+@EnableScheduling // +++
+public class OrderingServiceApplication {
+    public static void main(String[] args) {
+       SpringApplication.run(OrderingServiceApplication.class, args);
+    }
+}
+----
+
+🔹 Теперь Spring сможет запускать фоновые задачи для обработки Outbox.
+
+==== 2) Создание `OutboxService`
+
+Добавим **сервис, который будет забирать сообщения из Outbox и отправлять их в Kafka**.
+
+[source,java]
+----
+@Service
+public class OutboxService {
+    private final OutboxMessageRepository outboxMessageRepository;
+    private final StreamBridge streamBridge;
+    private final ObjectMapper mapper;
+    private final Logger logger = LoggerFactory.getLogger(getClass());
+
+    public OutboxService(
+       OutboxMessageRepository outboxMessageRepository,
+       StreamBridge streamBridge,
+       ObjectMapper mapper
+    ) {
+       this.outboxMessageRepository = outboxMessageRepository;
+       this.streamBridge = streamBridge;
+       this.mapper = mapper;
+    }
+
+    @Transactional
+    @Scheduled(fixedRate = 3000)  // Запуск каждые 3 секунды
+    public void processOutboxMessages() throws JsonProcessingException {
+       List<OutboxMessage> outboxMessages =
+	outboxMessageRepository.findAllBySentIsFalseOrderByDate();
+
+       // Обрабатываем сообщения
+       for (OutboxMessage outboxMessage : outboxMessages) {
+          OrderData orderData = mapper.readValue(
+                    outboxMessage.getMessage(), OrderData.class);
+          boolean sent = streamBridge.send("orders", orderData);
+
+          if (sent) {
+             logger.info("Событие о заказе отправлено в Kafka: {}", orderData);
+             outboxMessage.setSent(true);
+             outboxMessageRepository.save(outboxMessage);
+          } else {
+              throw new RuntimeException("Ошибка при отправке сообщения в Kafka");
+          }
+       }
+    }
+}
+----
+
+=== Как это работает?
+1. **Spring Scheduler** каждые 3 секунды **проверяет Outbox**.
+2. Он **отправляет сообщения в Kafka**.
+3. **Если отправка успешна**, сообщение помечается как `sent=true`.
+4. Если Kafka недоступна, **сообщение останется в таблице и будет отправлено при следующем запуске.**
+
+🔹 Это **гарантирует, что ни одно сообщение не потеряется**!
+
+
+== Итоги: что мы сделали
+
+- **Реализовали Outbox-паттерн** в `Ordering Service`.
+- **Теперь сообщения сохраняются в БД перед отправкой** → это делает процесс **надёжным**.
+- **Настроили планировщик Spring, который отправляет сообщения каждые 3 секунды**.
+- **Гарантируем, что каждое сообщение отправится только один раз**.
+
+== Тестирование
+
+Для проверки работы выполните следующие шаги:
+
+1. **Запустите Ordering Service**.
+2. **Остановите Kafka**: `docker-compose stop kafka`. Это симулирует сбой Kafka.
+3. **Отправьте запрос на создание заказа**. Заказ должен быть создан, но сообщение не отправлено (из-за сбоя Kafka).
+4. **Проверьте таблицу `outbox_messages`** в базе данных. Там должно быть неотправленное сообщение о заказе (статус `sent=false`).
+5. **Запустите Kafka**: `docker-compose start kafka`.
+6. **Проверьте логи Ordering Service**. Там должно быть сообщение о том, что заказ отправлен в Kafka.
+7. **Проверьте таблицу `outbox_messages`**. Статус сообщения должен быть `sent=true`.
+
+Таким образом, мы **проверили, что сообщения отправляются надёжно** и **не теряются** даже при сбоях Kafka. Это гарантирует, что **все сервисы получат сообщение как минимум один раз, когда Kafka восстановится**.
+
+=== Поздравляем! Задание выполнено! 🎉
+
+Теперь система **устойчива к сбоям**, а Kafka **не перегружается лишними повторными отправками**!

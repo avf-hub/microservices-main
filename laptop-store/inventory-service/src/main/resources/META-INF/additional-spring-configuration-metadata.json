@@ -1,0 +1,33 @@
+{
+  "groups": [
+    {
+      "name": "inventory-service",
+      "type": "store.laptop.inventory.config.ApplicationPropertiesConfiguration",
+      "sourceType": "store.laptop.inventory.config.ApplicationPropertiesConfiguration"
+    }
+  ],
+  "properties": [
+    {
+      "name": "inventory-service.create-initial-data-on-start",
+      "type": "java.lang.Boolean",
+      "description": "Creates initial data on application start.",
+      "sourceType": "store.laptop.inventory.config.ApplicationPropertiesConfiguration",
+      "defaultValue": false
+    }
+  ],
+  "hints": [
+    {
+      "name": "inventory-service.create-initial-data-on-start",
+      "values": [
+        {
+          "value": true,
+          "description": "Enable initial data creation on application start."
+        },
+        {
+          "value": false,
+          "description": "Disable initial data creation on application start (default)."
+        }
+      ]
+    }
+  ]
+}

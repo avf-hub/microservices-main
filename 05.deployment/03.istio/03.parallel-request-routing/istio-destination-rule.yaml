@@ -1,0 +1,31 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: mouse-reviews
+spec:
+  host: mouse-reviews
+  subsets:
+    - name: v1
+      labels:
+        app: mouse-reviews
+        version: v1
+    - name: v2
+      labels:
+        app: mouse-reviews
+        version: v2
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: mouse-catalog
+spec:
+  host: mouse-catalog
+  subsets:
+    - name: v1
+      labels:
+        app: mouse-catalog
+        version: v1
+    - name: v2
+      labels:
+        app: mouse-catalog
+        version: v2

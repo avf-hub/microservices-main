@@ -1,0 +1,127 @@
+= Task 3. Using SAGA pattern to refund payment when shipping is cancelled
+
+=== Introduction
+
+The shipping can be canceled. In this case, we should return the money to the buyer.
+
+We will be using SAGA pattern to do this.
+
+In TASK2 we implemented this interaction:
+
+makePayment(orderId) -> *paymentService* -> (message to paid-orders) -> *shippingService* -> startShipping(orderId)
+
+Now we should add this flow:
+
+clearShipping(orderId) -> *shippingService* -> cancelShipping(orderId) -> (message to cancelled-orders) ->
+*paymentService* -> refundPayment(orderId)
+
+== Implementation
+
+To implement this, let’s first update Payment Service and add the possibility of money back.
+
+In PaymentService class, add these methods:
+
+[source,java]
+----
+@Bean
+public Consumer<Long> revertPayment() {
+    return orderId -> {
+       Optional<Payment> paymentOptional =
+           paymentRepository.findByOrderId(orderId);
+       Payment payment;
+       if (paymentOptional.isPresent()) {
+          payment = paymentOptional.get();
+          if (PaymentStatus.IN_PROCESS == payment.getPaymentStatus()) {
+             payment.setPaymentStatus(PaymentStatus.CANCELLED);
+             paymentRepository.save(payment);
+          } else if (PaymentStatus.PAID == payment.getPaymentStatus()) {
+             payment.setPaymentStatus(PaymentStatus.CANCELLED);
+             paymentRepository.save(payment);
+             moneyBack(payment);
+          }
+       }
+    };
+}
+
+public void moneyBack(Payment payment) {
+    System.out.println("Money for payment "+payment.getId()+
+          " returned to the customer "+payment.getCustomerId()+": "+
+          "$"+payment.getPaymentCost()+" compensated");
+}
+
+----
+
+Now we want to listen to the topic of cancelled orders.
+If the order is canceled, we return money.
+
+Add this configuration to application.yaml of Payment Service:
+
+[source,yaml]
+----
+spring:
+  cloud:
+    stream:
+      bindings:
+        revertPayment-in-0:
+          destination: cancelled-orders
+          group: payment
+----
+
+Update PaymentStatus by adding CANCELLED:
+
+[source,java]
+----
+public enum PaymentStatus {
+    UNPAID, IN_PROCESS, PAID, CANCELLED
+}
+----
+
+The current version of clearShipping() in ShippingService only removes shipping from the database.
+
+Modidy method clearShipping() to send a message:
+
+[source,java]
+----
+public boolean clearShipping(Long orderId) {
+    Optional<Shipping> shippingOptional =
+       shippingRepository.findByOrderId(orderId);
+    Shipping shipping;
+    if (shippingOptional.isPresent()) {
+       shipping = shippingOptional.get();
+       if (ShippingStatus.IN_DELIVERY == shipping.getShippingStatus()) {
+          cancelShipping(orderId);			// +++
+          shippingRepository.delete(shipping);
+          return true;
+       } else if (ShippingStatus.DELIVERED == shipping.getShippingStatus()) {
+          throw new ShippingValidationException(
+             "Order is already delivered",
+             shipping.getId()
+          );
+       } else if (ShippingStatus.UNKNOWN == shipping.getShippingStatus()) {
+          throw new ShippingValidationException(
+             "Order is not in process of delivery",
+             shipping.getId()
+          );
+       }
+    } else {
+       throw new ShippingValidationException(
+             "Shipping for Order is not found",
+             orderId
+       );
+    }
+    return false;
+}
+
+private void cancelShipping(Long orderId) {		// +++
+    streamBridge.send("cancelled-orders", orderId);	// +++
+}							  // +++
+
+----
+
+Now, when endpoint cancel shipping is used, the client should receive money back – you should be able to find information about it in the log.
+
+== Testing
+
+You can use *_http/saga.http* to test this functionality. Don’t forget to restart the Shipping Service and the Payment Service.
+
+After cancelling the shipping, you should see the message about the money being returned in the Payment Service logs.

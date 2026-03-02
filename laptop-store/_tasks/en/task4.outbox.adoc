@@ -1,0 +1,179 @@
+= TASK 4: Outbox pattern
+
+The Outbox pattern is a way to ensure that messages are sent only once. It is a common pattern in distributed systems. In this task, you will implement the Outbox pattern in the laptop-store application.
+
+Currently, in OrderController we do 2 things:
+
+* Update order info in the DB (change order state to PLACED)
+* Publish the message for external services
+
+Comment out publishing a message in OrderController, we will not do it directly anymore. Instead, we will send them to the Outbox table.
+
+[source,java]
+----
+@Override
+public OrderInfo placeOrder(PlaceOrderRequest orderRequest) {
+    Order order = processingService.placeOrder(orderRequest);
+    orderMessagingPublisher.publish(orderDataMapper.map(order)); // REMOVE THIS LINE
+    return orderInfoMapper.map(order);
+}
+----
+
+
+For the Outbox pattern, we need to introduce an Outbox table.
+
+For this, in Ordering Service, introduce a new table in *resources/db/changelog/db.changelog-ordering-create-tables.xml*:
+
+[source,xml]
+----
+<createTable tableName="outbox_messages">
+    <column name="id" type="bigint" autoIncrement="true">
+        <constraints primaryKey="true"
+                     nullable="false"
+                     unique="true"/>
+    </column>
+    <column name="message" type="varchar(300)"/>
+    <column name="sent" type="boolean"/>
+    <column name="date" type="datetime"/>
+</createTable>
+----
+
+Then, in *domain/model* subfolder, introduce the entity and repository for Outbox table:
+
+[source,java]
+----
+@Entity
+@Data
+@Table(name = "outbox_messages")
+public class OutboxMessage {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    // universal event data
+    private String message;
+
+    private Boolean sent = false;
+
+    private Date date;
+
+}
+
+public interface OutboxMessageRepository
+extends JpaRepository<OutboxMessage, Long> {
+    List<OutboxMessage> findAllBySentIsFalseOrderByDate();
+}
+----
+
+Well, we have everything prepared to publish messages to the Outbox table.
+This is how the current OutboxProcessingService look:
+
+[source,java]
+----
+public Order placeOrder(PlaceOrderRequest placeOrderRequest)
+	throws OrderProcessingException {
+    Order order = placeOrderRequestMapper.map(placeOrderRequest);
+    order.setOrderState(OrderState.PLACED);
+    order = orderRepository.save(order);
+
+    return order;
+}
+----
+
+Let’s publish it in OrderProcessingService.placeOrder:
+
+[source,java]
+----
+@Transactional
+public Order placeOrder(Order newOrder) {
+    newOrder.setOrderState(OrderState.PLACED);
+    Order order = orderRepository.save(newOrder);
+
+    try {
+       OutboxMessage outboxMessage = new OutboxMessage();
+       String orderDataJson = mapper.writeValueAsString(
+              orderDataMapper.map(order));
+       outboxMessage.setMessage(orderDataJson);
+       outboxMessageRepository.save(outboxMessage);
+    } catch (JsonProcessingException e) {
+       throw new RuntimeException(e);
+    }
+
+    return order;
+}
+
+----
+
+Here we save information about new orders to the database, but do not send it. Pay attention to @Transactional: this is ensuring that both operations (changing the order state and adding to the Outbox table) are completed successfully or rejected.
+
+We will use a scheduler to send the messages from the Outbox table.
+For this, first, enable the scheduler in OrderingServiceApplication:
+
+[source,java]
+----
+@SpringBootApplication
+@EnableScheduling // +++
+public class OrderingServiceApplication {
+    public static void main(String[] args) {
+       SpringApplication.run(OrderingServiceApplication.class, args);
+    }
+}
+----
+
+Then, use it to check the outbox periodically and send the messages to Kafka.
+We will introduce an OutboxService in store.laptop.ordering.domain.service package:
+
+[source,java]
+----
+@Service
+public class OutboxService {
+    private final OutboxMessageRepository outboxMessageRepository;
+    private final StreamBridge streamBridge;
+    private final ObjectMapper mapper;
+    private final Logger logger = LoggerFactory.getLogger(getClass());
+
+    public OutboxService(
+       OutboxMessageRepository outboxMessageRepository,
+       StreamBridge streamBridge,
+       ObjectMapper mapper
+    ) {
+       this.outboxMessageRepository = outboxMessageRepository;
+       this.streamBridge = streamBridge;
+       this.mapper = mapper;
+    }
+
+    @Transactional
+    @Scheduled(fixedRate = 3000)
+    public void processOutboxMessages() throws JsonProcessingException {
+       List<OutboxMessage> outboxMessages =
+	outboxMessageRepository.findAllBySentIsFalseOrderByDate();
+
+       // We are supporting only one payload type right now for simplicity
+       for (OutboxMessage outboxMessage : outboxMessages) {
+          OrderData orderData = mapper.readValue(
+                    outboxMessage.getMessage(), OrderData.class);
+          boolean sent = streamBridge.send("orders", orderData);
+
+          if (sent) {
+             logger.info("order placed event has been sent to 'orders' topic: {}",
+		orderData);
+             // we could also delete that message
+             // to keep the table from constantly growing
+             outboxMessage.setSent(true);
+             outboxMessageRepository.save(outboxMessage);
+          } else {
+              throw new RuntimeException("Failed to send message to Kafka, terminate sending until next attempt");
+          }
+       }
+    }
+}
+----
+
+Here we are sending messages from the Outbox table to the orders topic. We are using the StreamBridge to send messages to Kafka. We are also updating the sent flag in the Outbox table.
+
+In case if message was not sent, we throw an exception to stop the scheduler from sending next messages until the next attempt. Otherwise, the messages may be reordered (later messages may be sent before earlier ones).
+
+
+
+
+

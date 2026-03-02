@@ -1,0 +1,7 @@
+### get review for book 1
+
+GET http://localhost:6080/reviews/1
+
+### get book 1
+
+GET http://localhost:6081/books/1

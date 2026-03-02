@@ -1,0 +1,43 @@
+@startuml
+actor Клиент
+participant "Каталог" as Catalog
+participant "Корзина" as Cart
+participant "Система\n заказов" as Ordering
+participant "Склад" as Inventory
+participant "Сервис\n оплаты" as Payment
+participant "Сервис\n выставления\n счетов" as Invoicing
+participant "Сервис доставки" as Shipping
+participant "Сервис\n отслеживания\n заказов" as Tracking
+
+=== Просмотр каталога ===
+Клиент -> Catalog : Просматривает\nсписок ноутбуков
+Клиент -> Catalog : Фильтрует\nпо характеристикам
+Клиент -> Catalog : Открывает\nстраницу ноутбука
+
+=== Управление корзиной ===
+Клиент -> Cart : Добавляет\nноутбук\nв корзину
+Клиент -> Cart : Изменяет\nколичество\nноутбуков
+Клиент -> Cart : Удаляет\nноутбук\nиз корзины
+Cart -> Catalog : Запрашивает\nактуальные\nданные о товаре
+
+=== Оформление заказа ===
+Клиент -> Ordering : Оформляет\nзаказ
+Ordering -> Cart : Запрашивает\nсодержимое\nкорзины
+Ordering -> Inventory : Проверяет\nналичие\nтовара
+Inventory -> Ordering : Подтверждает\nналичие
+Ordering -> Payment : Запрашивает\nоплату
+
+=== Оплата заказа ===
+Клиент -> Payment : Выполняет оплату
+Payment -> Invoicing : Запрашивает\nформирование\nсчета
+Invoicing -> Payment : Подтверждает\nсоздание\nсчета
+Payment -> Ordering : Подтверждает оплату
+
+=== Доставка ===
+Ordering -> Shipping : Создаёт заявку на доставку
+Shipping -> Клиент : Отправляет уведомление о доставке
+Shipping -> Tracking : Обновляет статус заказа
+Клиент -> Tracking : Проверяет статус заказа
+Tracking -> Клиент : Сообщает, что заказ доставлен
+
+@enduml

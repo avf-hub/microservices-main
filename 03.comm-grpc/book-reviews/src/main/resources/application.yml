@@ -1,0 +1,7 @@
+grpc:
+  port: 6566
+  enable-reflection: true
+app:
+  book-service-address:
+    host: localhost
+    port: 6565

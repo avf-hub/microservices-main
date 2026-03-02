@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.1.xsd">
+
+    <changeSet id="insert-laptops-init-data" author="katunov" context="ordering">
+        <insert tableName="customer_orders">
+            <column name="customer_id" value="555"/>
+            <column name="order_state" value="CONFIRMED"/>
+        </insert>
+        <insert tableName="order_items">
+            <column name="order_id" value="1"/>
+            <column name="product_id" value="5"/>
+            <column name="qty" value="1"/>
+            <column name="cost" value="1200"/>
+        </insert>
+        <insert tableName="order_items">
+            <column name="order_id" value="1"/>
+            <column name="product_id" value="7"/>
+            <column name="qty" value="1"/>
+            <column name="cost" value="900"/>
+        </insert>
+        <insert tableName="customer_orders">
+            <!-- implicitly id=2 -->
+            <column name="customer_id" value="666"/>
+            <column name="order_state" value="CANCELED"/>
+        </insert>
+        <insert tableName="order_items">
+            <column name="order_id" value="2"/>
+            <column name="product_id" value="5"/>
+            <column name="qty" value="1"/>
+            <column name="cost" value="1200"/>
+        </insert>
+    </changeSet>
+</databaseChangeLog>

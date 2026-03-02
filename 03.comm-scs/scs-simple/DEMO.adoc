@@ -1,0 +1,88 @@
+= Партиционирование в Spring Cloud Stream
+
+== Добавление партиций
+
+Чтобы добавить партиции:
+
+1) В Processor добавьте следующую конфигурацию:
+
+[source,yaml]
+----
+toUpperCase-out-0:
+  destination: wordStreamResults
+  producer:               # +++
+    partitionCount: 2     # +++
+----
+
+Если топик уже создан, его нужно удалить, чтобы разбить на партиции.
+
+В противном случае, включите автоматическое добавление партиций:
+
+[source,yaml]
+----
+spring:
+  cloud:
+    stream:
+      kafka:
+        binder:
+          auto-add-partitions: true
+----
+
+2) Запустите 2 экземпляра приложения Subscriber:
+
+. Откройте *Edit Configurations...* в IDEA
+. Скопируйте конфигурацию Subscriber
+. Добавьте VM-опцию *-Dserver.port=8003*
+
+3) Выполните все запросы из *PublisherPartitions.rest*
+
+Теперь все экземпляры получают одинаковые сообщения.
+
+== Добавление группы потребителей
+
+Добавьте группу потребителей в конфигурацию Subscriber:
+
+[source,yaml]
+----
+spring:
+  cloud:
+    stream:
+      bindings:
+        process-in-0:
+          destination: wordStreamResults
+          group: group
+----
+
+Теперь сообщения распределяются между экземплярами.
+
+== Ключ партиции
+
+Определите, как распределять сообщения между экземплярами:
+
+[source,yaml]
+----
+toUpperCase-out-0:
+  destination: wordStreamResults
+  producer:
+    partitionCount: 2
+    partitionKeyExpression: payload.startsWith("H")?0:1     # +++
+----
+
+Теперь сообщения распределяются между экземплярами в зависимости от первой буквы сообщения.
+
+Если запустить больше экземпляров Subscriber, чем задано партиций, не все Subscriber будут привязаны к отдельной партиции.
+Например, если partitionCount=2, а в группе потребителей три экземпляра:
+
+[source,text]
+----
+partition 1 -> subscriber 1
+partition 2 -> subscriber 2
+(ничего)    -> subscriber 3
+----
+
+== Долговечность (Durability)
+
+- Остановите все Subscriber
+- Отправьте сообщения
+- Запустите один из Subscriber
+- Убедитесь, что сообщения доставлены

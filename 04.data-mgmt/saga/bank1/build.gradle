@@ -1,0 +1,9 @@
+plugins {
+    id 'training.spring-cloud-stream-app'
+}
+
+dependencies {
+    implementation project(":saga-orchestrator")
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    runtimeOnly 'com.h2database:h2'
+}

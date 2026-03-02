@@ -1,0 +1,28 @@
+laptop-common-config:
+  services:
+    catalog-service:
+      remote-host: localhost
+      port: 8081
+    inventory-service:
+      remote-host: localhost
+      port: 8082
+    invoicing-service:
+      remote-host: localhost
+      port: 8083
+    order-tracking-service:
+      remote-host: localhost
+      port: 8084
+    ordering-service:
+      remote-host: localhost
+      port: 8085
+    payment-service:
+      remote-host: localhost
+      port: 8086
+    shipping-service:
+      remote-host: localhost
+      port: 8087
+    shopping-cart-service:
+      remote-host: localhost
+      port: 8088
+
+

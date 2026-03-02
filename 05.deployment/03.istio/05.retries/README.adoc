@@ -1,0 +1,44 @@
+= Retries
+
+Our book reviews is lagging.
+
+Randomly (50% of cases) it is not responding ASAP.
+It takes 5 seconds (simulated by code).
+
+We would like to configure a timeout for those operations and *automatically retry* them.
+
+Istio VirtualService specifies this using `retries` yaml entry:
+
+[source,yaml]
+----
+      retries:
+        attempts: 2
+        perTryTimeout: 2s
+        retryOn: 5xx
+----
+
+This means: Each time we wait *at most 2s* for the response. We will be issuing *at most 3 requests*.
+
+.This means the response from our system will range from:
+* *few milliseconds* - mouse-reviews responded without any delay
+* *2s+* - got a timeout, issued a single retry which succeeded.
+* *4s+* - 2 retries - still success
+* *6s+ timeout* - 2 retries were not enough to get a single response under 2s.
+
+[source,shell]
+.deploy app resources
+----
+kubectl apply -f .
+----
+
+[source,shell]
+.send request to mouse-catalog.
+----
+time curl -sv http://localhost/mice/1
+----
+
+[source,shell]
+.do not forget to clean up before trying out other examples
+----
+kubectl delete -f .
+----

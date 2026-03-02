@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.1.xsd">
+
+    <changeSet id="create-shopping_cart-tables" author="alex-v-yakunin" context="shopping-cart">
+        <createTable tableName="shopping_carts">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true"
+                             nullable="false"
+                             unique="true"/>
+            </column>
+        </createTable>
+        <createTable tableName="shopping_cart_items">
+            <column name="cart_id" type="bigint">
+                <constraints nullable="false"
+                             foreignKeyName="fk_shopping_cart_items_shopping_carts"
+                             references="shopping_carts(id)"/>
+            </column>
+            <column name="product_id" type="bigint"/>
+            <column name="qty" type="bigint"/>
+        </createTable>
+    </changeSet>
+</databaseChangeLog>

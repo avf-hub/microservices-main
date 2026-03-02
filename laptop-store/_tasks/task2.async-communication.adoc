@@ -1,0 +1,229 @@
+:toc:
+:toclevels: 2
+
+= Задание 2. Асинхронная коммуникация
+
+== Задача: автоматический запуск доставки после оплаты
+
+Наша цель — **автоматически запускать процесс доставки после оплаты заказа**.
+
+Для этого мы используем **Spring Cloud Stream**, который позволяет организовать **асинхронное взаимодействие между микросервисами** с помощью сообщений.
+
+Некоторые части кода **уже реализованы**, и нам нужно их доработать.
+
+Вот как это будет работать:
+
+[plantuml,plantuml-diagram,svg]
+----
+@startuml
+autonumber
+actor User
+participant "Payment Service" as PaymentService
+queue "Kafka Topic:\n paid-orders" as Kafka
+participant "Shipping Service" as ShippingService
+
+User -> PaymentService: makePayment(orderId)
+PaymentService -> Kafka: send(orderId)
+Kafka -> ShippingService: received(orderId)
+ShippingService -> ShippingService: startShipping(orderId)
+
+@enduml
+----
+
+- Здесь **`makePayment(orderId)`** — это метод, который **инициирует оплату заказа**.
+
+- **`Payment Service`** после успешной оплаты **отправляет сообщение в топик `paid-orders`**.
+
+- **`Shipping Service`** получает это сообщение и **автоматически начинает доставку**.
+
+=== Что нужно сделать:
+
+1. **Запустить Kafka**.
+2. **Отправить сообщение в Kafka** после оплаты заказа.
+3. **Добавить обработчик сообщений** (слушатель) в Shipping Service.
+4. При получении сообщения **автоматически начать доставку**.
+
+
+== Запуск Kafka
+
+Перейдите в папку `infra/kafka` и выполните команду:
+
+[source,shell]
+----
+docker compose up -d
+----
+
+Эта команда запустит **локальный кластер Kafka**.
+
+Если вы используете IntelliJ IDEA, можно также **щелкнуть правой кнопкой** на файле `infra/kafka/docker-compose.yaml` и выбрать **"Run"**.
+
+Если **использование Docker запрещено** (например, из-за коммерческой лицензии), можно использовать **Podman**, который является бесплатной альтернативой Docker.
+
+Установите Podman и выполните команду:
+
+[source,shell]
+----
+podman compose --file docker-compose.yaml up --detach
+----
+
+== Добавление зависимости Kafka Binder
+
+Зависимость **Spring Cloud Stream Kafka Binder** **уже добавлена** в проекты `laptop-store`:
+
+[source,groovy]
+.buildSrc/src/main/groovy/training.laptop-store-service.gradle
+----
+dependencies {
+    implementation 'org.springframework.cloud:spring-cloud-starter-stream-kafka'
+}
+----
+
+Теперь **включим отправку сообщений**:
+
+[source,yaml]
+.laptop-store/ordering-service/src/main/resources/application.yml
+----
+app:
+  disable-message-publishing: false
+----
+Мы отключили запрет на отправку сообщений, который добавлен, чтобы избежать зависимости от Kafka до этого момента.
+
+После этого **инвойсы (счета-фактуры)
+должны автоматически создаваться** при оформлении заказа.
+Проверьте это, создав заказ и затем вызвав следующий HTTP-запрос:
+
+[source,http]
+----
+### получение инвойса (счета-фактуры) по заказу
+GET http://localhost:8083/invoices/byOrder/{{order-id}}
+----
+
+== Отправка сообщений из PaymentService
+
+Мы должны **автоматически инициировать доставку заказа**, как только **оплата будет завершена**.
+
+Для этого:
+
+- **После завершения платежа отправляем сообщение в Kafka (топик `paid-orders`)**.
+- **Shipping Service получает сообщение и запускает процесс доставки**.
+
+### Как работает статус платежа?
+Платежи не переходят в статус `PAID` сразу, а проходят **три стадии**:
+
+1. `UNPAID` → (начальный статус)
+2. `IN_PROCESS` → (имитация обработки, 30 секунд)
+3. `PAID` → (финальный статус)
+
+Метод `processPayments()` **каждые 30 секунд проверяет** платежи в статусе `IN_PROCESS`
+и переводит их в `PAID`.
+
+Теперь нам нужно **добавить отправку сообщения** в `paid-orders` после обновления статуса.
+
+[source,java]
+.PaymentService.java
+----
+@Scheduled(fixedRate = 30, timeUnit = TimeUnit.SECONDS)
+@Transactional
+public void processPayments() {
+    DelayedId delayedId = paymentsQueue.poll();
+    if (delayedId != null) {
+       Payment payment =
+          paymentRepository.findById(delayedId.getId()).orElseThrow();
+       payment.setPaymentStatus(PaymentStatus.PAID);
+       paymentRepository.save(payment);
+       startShipment(payment.getOrderId());     // +++
+    }
+}
+
+public void startShipment(Long orderId) {       // +++
+    streamBridge.send("paid-orders", orderId);  // +++
+}                                               // +++
+----
+
+Теперь **при оформлении заказа** можно будет увидеть, как **сообщения отправляются в Kafka**.
+Для проверки используйте **Kafka UI** и просмотрите содержимое топика.
+
+== Получение сообщений в Shipping Service
+
+В `Shipping Service` добавьте следующий обработчик сообщений:
+
+[source,java]
+.MessageHandlersConfiguration.java
+----
+@Configuration
+public class MessageHandlersConfiguration {
+    private final ShippingService shippingService;
+
+    public MessageHandlersConfiguration(ShippingService shippingService) {
+        this.shippingService = shippingService;
+    }
+
+    @Bean
+    public Consumer<Long> shippingAfterPayment() {
+        return shippingService::startShipping;
+    }
+}
+----
+
+Теперь сервис **будет слушать топик `paid-orders`** и автоматически начинать доставку.
+
+Также добавьте конфигурацию в `application.yaml`, чтобы **Shipping Service знал, откуда получать сообщения**:
+
+[source,yaml]
+.application.yaml
+----
+spring:
+  cloud:
+    stream:
+      bindings:
+        shippingAfterPayment-in-0:
+          destination: paid-orders
+          group: shipping
+----
+
+После этих изменений **заказ автоматически переходит в статус `IN_DELIVERY`**,
+как только **платеж получает статус `PAID`**.
+
+**Не забудьте перезапустить `Ordering Service` и `Shipping Service` после внесения изменений!**
+
+== Тестирование
+
+Для проверки работы используйте **файл `rest.http`** и выполните следующие шаги:
+
+1. **Создать заказ**
+2. **Подтвердить заказ**
+3. **Оплатить заказ**
+4. **Проверить статус доставки в Shipping Service**
+- Должен автоматически измениться на `IN_DELIVERY`.
+
+Дополнительно можно использовать **Order Tracking Service** для получения сводного статуса заказа.
+
+=== Поздравляем! Задание выполнено! 🎉
+
+Теперь **доставка автоматически запускается после оплаты** заказа.
+
+== Дополнительное задание: оптимизация Order Tracking Service
+
+В данный момент **Order Tracking Service запрашивает данные у Ordering Service, Payment Service и Shipping Service при каждом запросе**.
+Это создает **дополнительную нагрузку на систему** и **замедляет получение статуса**.
+
+=== Задача:
+
+Оптимизировать `Order Tracking Service`, чтобы он **обновлял статус заказа через события** (а не через запросы в другие сервисы).
+
+=== Как это сделать:
+
+**Order Tracking Service должен подписываться на Kafka-топики**, чтобы получать обновления статуса. Например:
+
+- Когда платеж завершен → **Order Tracking Service получает сообщение и обновляет статус в своей БД**.
+- Когда доставка началась → **Order Tracking Service получает событие и фиксирует новый статус**.
+
+=== Ожидаемый результат:
+После доработки **Order Tracking Service сможет мгновенно отвечать на запросы**
+**без необходимости запрашивать данные у других сервисов**.
+
+**После реализации этого задания:**
+
+- **Доставка будет запускаться автоматически после оплаты.**
+- **Order Tracking Service станет более эффективным, так как перестанет загружать систему лишними запросами.**
+- **Kafka будет использоваться для событийно-ориентированного взаимодействия между микросервисами.**

@@ -1,0 +1,152 @@
+= Mini app in Kubernetes
+:source-highlighter: highlight.js
+:icons: font
+
+WARNING: mini app is deployed into a separate namespace! Specify `mini-app` namespace for your kubectl operations. No need to do it for `apply/delete` - YAML descriptors contain namespace references.
+
+[source,shell]
+.Make sure you start fresh
+----
+docker context use default
+minikube delete
+----
+
+[source,shell]
+.Create a new cluster - requires admin privileges. This might not work inside IDE (try with sudo)
+----
+minikube start
+----
+
+[source,shell]
+.setup docker client to minikube registry
+----
+./infra/kubernetes/setup-minikube-context.sh
+----
+
+[source,shell]
+----
+docker context use minikube
+----
+
+Set your credentials to Docker Hub in `gradle.properties`
+
+[source,shell]
+.Compile, build, containerize in just a single command.
+----
+./gradlew :mini:jibDockerBuild
+----
+
+[source,shell]
+.Check if minikube contains your images
+----
+docker image list
+----
+
+[source,shell]
+.Switch back to default docker context (required for dasboards and tunnels)
+----
+docker context use default
+----
+
+[source,shell]
+.Run minikube dashboard for monitoring. Make sure your Docker context is 'default'. Block the terminal - leave it running. You might need to run sudo/elevated shell on Windows.
+----
+# use `sudo minikube dashboard` on Linux/MacOSX
+minikube dashboard
+----
+
+[source,shell]
+.Deploy app in `mini-app` namespace
+----
+kubectl apply -f mini/k8s/
+----
+
+[source,shell]
+.Checking deployment status
+----
+kubectl rollout status --namespace mini-app deployment/mini
+----
+
+It will hang and provide you with current status or show:
+
+[source,shell]
+----
+deployment "mini" successfully rolled out
+----
+
+and exit.
+
+
+[source,shell]
+.Accessing the app
+----
+minikube service --namespace mini-app mini --url
+----
+<1> Use the provided url to access deployed app. Skipping `--url` will open the browser automatically.
+
+[source,shell]
+----
+$ curl -s http://127.0.0.1:54806 # <1>
+Hello from MiniApp with ID: #952
+
+$ curl -s http://127.0.0.1:54806
+Hello from MiniApp with ID: #983
+
+$ curl -s http://127.0.0.1:54806
+Hello from MiniApp with ID: #282
+----
+<1> Notice you are getting responses from different app instances. LoadBalancer is doing it's job!
+
+== Debugging
+
+[source,shell]
+.Get list of pods
+----
+kubectl get pods --namespace mini-app
+----
+
+[source,shell]
+.Inspect logs
+----
+FIRST_POD=$(kubectl get pods -l app=mini -n mini-app -o=name | head -n 1)
+kubectl logs --namespace mini-app $FIRST_POD #<1>
+----
+<1> Get the pod name from previous command
+
+[source,shell]
+.Show all mini pods logs
+----
+kubectl logs -l app=mini -n mini-app --tail=500
+----
+
+[source,shell]
+.Kill the pod, watch how k8s reconciliates
+----
+FIRST_POD=$(kubectl get pods -l app=mini -n mini-app -o=name | head -n 1)
+kubectl --namespace mini-app -it exec $FIRST_POD -- kill 1
+----
+
+.To kill a pod, you can use this command
+[source,shell]
+----
+curl -s http://127.0.0.1:<port>/kill
+----
+
+[source,shell]
+.List pods again, notice the RESTARTS count
+----
+kubectl get pods --namespace mini-app
+----
+
+[source,shell]
+.Scale imperatively
+----
+kubectl scale --replicas=4 --namespace mini-app deployment/mini # <1>
+----
+<1> or modify mini-deployment.yaml and redeploy
+
+[source,shell]
+.Clean up - deletes all resources for mini app
+----
+kubectl delete namespace mini-app
+----

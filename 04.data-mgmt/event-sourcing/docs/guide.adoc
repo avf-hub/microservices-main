@@ -1,0 +1,246 @@
+:toc:
+:toclevels: 2
+:source-highlighter: rouge
+
+= Event Sourcing: теория и практическая реализация
+
+== 📌 Введение
+
+Event Sourcing — это архитектурный шаблон, при котором система не хранит состояние напрямую, а записывает все изменения в виде событий. Это позволяет восстанавливать текущее состояние, проигрывая последовательность событий.
+
+🎯 Преимущества Event Sourcing:
+
+- 📜 *История изменений* — можно восстановить любое предыдущее состояние.
+- 🔄 *Time Travel* — откат системы назад к любому моменту.
+- 🚀 *Горизонтальное масштабирование* — легко реплицировать данные.
+- ⚡ *Снепшоты* — ускоренное восстановление, без проигрывания всех событий.
+
+== 📐 Архитектура системы
+
+Event Sourcing включает 2 ключевых компонента:
+
+1️⃣ *Event Store (`EventRepository`)* — хранилище событий.
+
+2️⃣ *Event Handler (`Bank`)* — обработчик, который управляет операциями.
+
+
+[plantuml, event_sourcing_overview, svg]
+----
+@startuml
+autonumber
+actor "Пользователь" as User
+participant "Bank" as Bank
+database "Event Store" as EventStore
+
+== 🏦 Создание аккаунта ==
+User -> Bank: createAccount(name, initialDeposit)
+Bank -> EventStore: save AccountCreated
+
+== 💰 Пополнение счета ==
+User -> Bank: deposit(accountId, amount)
+Bank -> EventStore: save MoneyDeposited
+
+== 🔄 Перевод средств ==
+User -> Bank: transfer(fromId, toId, amount)
+Bank -> EventStore: save MoneyWithdrawn
+Bank -> EventStore: save MoneyDeposited
+
+== ⏳ Восстановление состояния ==
+User -> Bank: getBalanceAtTimestamp(accountId, timestamp)
+Bank -> EventStore: load events until timestamp
+
+== 💾 Снепшоты ==
+User -> Bank: createSnapshot(accountId)
+Bank -> EventStore: save SnapshotCreated
+
+User -> Bank: restoreFromSnapshot(accountId)
+Bank -> EventStore: load last SnapshotCreated
+Bank -> EventStore: apply events after snapshot
+@enduml
+----
+
+== 🔹 Реализация Event Sourcing в Java
+
+=== 1️⃣ Определение событий (`Event`)
+
+[source,java]
+----
+@Entity
+@Table(name = "events")
+@Getter
+@NoArgsConstructor
+public class Event {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private UUID accountId;
+    private String type;
+    private double amount;
+    private Date date;
+
+    public Event(UUID accountId, String type, double amount) {
+        this.accountId = accountId;
+        this.type = type;
+        this.amount = amount;
+        this.date = new Date();
+    }
+}
+----
+
+- Каждое событие фиксирует операцию: `AccountCreated`, `MoneyDeposited`, `MoneyWithdrawn`.
+- События неизменяемы.
+
+=== 2️⃣ Хранилище событий (`EventRepository`)
+
+[source,java]
+----
+public interface EventRepository extends CrudRepository<Event, Long> {
+    List<Event> findByAccountIdOrderByDate(UUID accountId);
+}
+----
+
+- Позволяет запрашивать события для конкретного аккаунта.
+- События всегда упорядочены по времени.
+
+=== 3️⃣ Управление событиями (`Bank`)
+
+[source,java]
+----
+public class Bank {
+    private final EventRepository eventRepository;
+
+    public Bank(EventRepository eventRepository) {
+        this.eventRepository = eventRepository;
+    }
+
+    public UUID createAccount(String name, double initialDeposit) {
+        UUID accountId = UUID.randomUUID();
+        eventRepository.save(new Event(accountId, "AccountCreated", initialDeposit));
+        return accountId;
+    }
+
+    public void deposit(UUID accountId, double amount) {
+        eventRepository.save(new Event(accountId, "MoneyDeposited", amount));
+    }
+
+    public void withdraw(UUID accountId, double amount) {
+        if (calculateBalance(accountId) < amount) {
+            throw new IllegalStateException("Недостаточно средств");
+        }
+        eventRepository.save(new Event(accountId, "MoneyWithdrawn", amount));
+    }
+
+    public void transfer(UUID fromId, UUID toId, double amount) {
+        withdraw(fromId, amount);
+        deposit(toId, amount);
+    }
+
+    public double calculateBalance(UUID accountId) {
+        return eventRepository.findByAccountIdOrderByDate(accountId)
+                .stream()
+                .mapToDouble(event -> switch (event.getType()) {
+                    case "AccountCreated", "MoneyDeposited" -> event.getAmount();
+                    case "MoneyWithdrawn" -> -event.getAmount();
+                    default -> 0;
+                })
+                .sum();
+    }
+}
+----
+
+- Нет хранения состояния → баланс вычисляется на лету.
+- Все изменения фиксируются как события в Event Store.
+
+=== 4️⃣ Time Travel (восстановление состояния на дату)
+
+[source,java]
+----
+public double getBalanceAtTimestamp(UUID accountId, Date timestamp) {
+    return eventRepository.findByAccountIdOrderByDate(accountId)
+            .stream()
+            .filter(event -> event.getDate().before(timestamp))
+            .mapToDouble(event -> switch (event.getType()) {
+                case "AccountCreated", "MoneyDeposited" -> event.getAmount();
+                case "MoneyWithdrawn" -> -event.getAmount();
+                default -> 0;
+            })
+            .sum();
+}
+----
+
+✅ Позволяет восстановить баланс на определённую дату.
+
+=== 5️⃣ Снепшоты (ускоренное восстановление)
+
+[source,java]
+----
+public void createSnapshot(UUID accountId) {
+    double balance = calculateBalance(accountId);
+    eventRepository.save(new Event(accountId, "SnapshotCreated", balance));
+}
+
+public double restoreFromSnapshot(UUID accountId) {
+    List<Event> events = eventRepository.findByAccountIdOrderByDate(accountId);
+
+    // Найти последний снепшот
+    Event lastSnapshot = events.stream()
+            .filter(event -> "SnapshotCreated".equals(event.getType()))
+            .reduce((first, second) -> second)
+            .orElseThrow(() -> new RuntimeException("Снепшот не найден"));
+
+    double balance = lastSnapshot.getAmount();
+
+    for (Event event : events) {
+        if (event.getDate().after(lastSnapshot.getDate())) {
+            balance += switch (event.getType()) {
+                case "MoneyDeposited" -> event.getAmount();
+                case "MoneyWithdrawn" -> -event.getAmount();
+                default -> 0;
+            };
+        }
+    }
+
+    return balance;
+}
+----
+✅ Восстанавливает баланс быстрее, применяя только новые события после последнего снепшота.
+
+== 🚀 Демонстрация в `EventSourcingDemoApplication`
+
+[source,java]
+----
+@SpringBootApplication
+public class EventSourcingDemoApplication {
+    public static void main(String[] args) {
+        ConfigurableApplicationContext context = SpringApplication.run(EventSourcingDemoApplication.class, args);
+        EventRepository eventRepository = context.getBean(EventRepository.class);
+        Bank bank = new Bank(eventRepository);
+
+        UUID aliceId = bank.createAccount("Alice", 1000);
+        UUID bobId = bank.createAccount("Bob", 500);
+
+        bank.deposit(aliceId, 300);
+        bank.withdraw(aliceId, 600);
+
+        Date snapshotTime = new Date();
+        bank.transfer(aliceId, bobId, 200);
+
+        double balanceAtSnapshot = bank.getBalanceAtTimestamp(aliceId, snapshotTime);
+        System.out.printf("💾 Баланс Alice на момент времени: %.2f%n", balanceAtSnapshot);
+
+        bank.createSnapshot(aliceId);
+        bank.deposit(aliceId, 500);
+
+        double restoredBalance = bank.restoreFromSnapshot(aliceId);
+        System.out.printf("📌 Восстановленный баланс из снепшота: %.2f%n", restoredBalance);
+    }
+}
+----
+
+== 🎯 Итог
+
+-  Полное Event Sourcing-приложение.
+-  Все изменения фиксируются в Event Store.
+-  Нет хранения текущего состояния, баланс вычисляется динамически.
+-  Time Travel, снепшоты.
+

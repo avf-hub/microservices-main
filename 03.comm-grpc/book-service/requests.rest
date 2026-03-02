@@ -1,0 +1,19 @@
+### Get a single request
+
+GRPC localhost:6565/com.bookstore.BookService/findById
+
+{
+  "id": 412
+}
+
+### Get a stream
+
+GRPC localhost:6565/com.bookstore.BookService/getBooks
+
+{
+  "count": 100,
+  "sort": "AUTHOR"
+}
+
+###
+

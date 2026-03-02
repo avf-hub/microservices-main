@@ -1,0 +1,7 @@
+### Using blocking client
+
+GET http://localhost:8080/reviews/byBook/1
+
+### Using non blocking client
+
+GET http://localhost:8080/reviews

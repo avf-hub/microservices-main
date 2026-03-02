@@ -1,0 +1,25 @@
+= Istio rate limiter
+
+We expose the REST API of our system to the public. We fear that some user will overuse it, or we will face DDOS attacks.
+
+We would like to limit how many requests/s the system will accept.
+
+[source,shell]
+.Deploy
+----
+kubectl apply -f .
+----
+
+TIP: The application deploys an EnvoyFilter which will limit the number of request in some specific time. If those limits are exceeded `HTTP 429 Too Many Request` is being sent to the client.
+
+[source,shell]
+.Watch for custom Envoy headers!
+----
+watch -n 1 "curl -s -D - http://localhost/mice/1"
+----
+
+[source,shell]
+.Tear down
+----
+kubectl delete -f .
+----

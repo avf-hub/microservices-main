@@ -1,0 +1,62 @@
+= Kubernetes mouse-store DEMO
+
+First, we need to build images and deploy it into docker registry.
+
+[source,shell]
+.Build mouse-catalog and mouse-reviews docker images and deploy it into docker registry: go to the root directory of the project and run
+----
+./build-mouse-store-images-to-k8s.sh
+----
+
+Now, we can deploy mouse-catalog and mouse-reviews into kubernetes cluster.
+
+[source,shell]
+.Deploy mouse-catalog and mouse-reviews into kubernetes cluster
+----
+kubectl apply -f .
+----
+
+Now, we can check the status of the pods.
+
+[source,shell]
+.Check the status of the pods
+----
+kubectl get pods -n mouse
+----
+
+We can check the status of the services.
+
+[source,shell]
+.Check the status of the services
+----
+kubectl get services -n mouse
+----
+
+To access the mouse-catalog service, we need to get the external IP address of the service with the port forwading.
+[source,shell]
+.Get the external IP address of the service with the port forwading
+----
+kubectl port-forward service/mouse-catalog 9090:8080 -n mouse
+----
+
+Now you can access the mouse-catalog service with the following URL.
+http://localhost:9090/1
+
+Internally, it will access the mouse-reviews service.
+
+Also, you can open minikube dashboard with the following command:
+[source,shell]
+.Open minikube dashboard
+----
+docker context use default
+minikube dashboard
+----
+
+
+
+
+[source,shell]
+.do not forget to clean up before trying out other examples
+----
+kubectl delete -f .
+----

@@ -1,0 +1,13 @@
+spring:
+  application:
+    name: Replier
+  cloud:
+    stream:
+      bindings:
+        reply-in-0:
+          destination: wordStreamReply
+        reply-out-0:
+          destination: wordStreamReplyTo
+
+server:
+  port: 8010

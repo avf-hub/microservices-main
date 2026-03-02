@@ -1,0 +1,68 @@
+plugins {
+    id 'java'
+    id 'io.spring.dependency-management'
+    id 'maven-publish'
+}
+
+group = 'training.jva083'
+version = '0.0.1-SNAPSHOT'
+
+java {
+    sourceCompatibility = '17'
+}
+
+
+repositories {
+    mavenCentral()
+    maven {
+        url = uri("https://packages.confluent.io/maven/")
+    }
+}
+
+publishing {
+    repositories {
+        maven {
+            name = "nexus"
+            allowInsecureProtocol = true
+            def snapshotsRepoUrl = uri("http://nexus.dev.local:9100/repository/maven-snapshots/")
+            def releasesRepoUrl = uri("http://nexus.dev.local:9100/repository/maven-releases/")
+            url = version.endsWith('SNAPSHOT') ? snapshotsRepoUrl : releasesRepoUrl
+            credentials {
+                username "admin"
+                password "admin123"
+            }
+        }
+    }
+}
+
+configurations {
+    compileOnly {
+        extendsFrom annotationProcessor
+    }
+}
+
+ext {
+    set('springCloudVersion', "2022.0.4")
+    set('springBootVersion', "3.1.2")
+    set('cucumberVersion', "7.13.0")
+}
+
+dependencyManagement {
+    imports {
+        mavenBom "org.springframework.boot:spring-boot-dependencies:${springBootVersion}"
+        mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
+        mavenBom "io.cucumber:cucumber-bom:${cucumberVersion}"
+    }
+}
+
+dependencies {
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+
+    // useful utility classes
+    implementation 'com.google.guava:guava:31.1-jre'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}

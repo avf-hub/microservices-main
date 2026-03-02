@@ -1,0 +1,11 @@
+plugins {
+    id 'training.boot-app'
+    id "io.github.lognet.grpc-spring-boot" version '5.1.5'
+}
+
+group = 'training.jva083.comm'
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    annotationProcessor 'no.entur.mapstruct.spi:protobuf-spi-impl:1.44'
+}

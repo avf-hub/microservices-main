@@ -1,0 +1,42 @@
+rootProject.name = 'jva083'
+
+addSubmodules('laptop-store')
+addSubmodules('mouse-store')
+
+addSubmodules('03.comm-grpc')
+addSubmodules('03.comm-rest')
+addSubmodules('03.comm-scs/scs-simple')
+addSubmodules('03.comm-scs/scs-errors')
+addSubmodules('03.comm-scs/request-reply')
+addSubmodules('04.data-mgmt/saga', 'saga')
+addModule("04.data-mgmt/cqrs")
+addModule("04.data-mgmt/event-sourcing")
+addModule("04.data-mgmt/saga-simple")
+
+include("mini")
+
+
+def addSubmodules(String root, String prefix = null) {
+    file(root).eachDir { sub ->
+        if (sub.getName().startsWith("_"))
+            return
+
+        String projectPrefix = prefix
+        if (projectPrefix == null)
+            projectPrefix = sanitizeFolderName(root)
+
+        String projectName = projectPrefix + "-" + sanitizeFolderName(sub.name)
+        include(projectName)
+        project(':' + projectName).projectDir = sub
+    }
+}
+
+def addModule(String path) {
+    String projectName = sanitizeFolderName(path)
+    include(projectName)
+    project(':' + projectName).projectDir = file(path)
+}
+
+private static String sanitizeFolderName(String root) {
+    root.replace(".", "-").replace("/", "-")
+}

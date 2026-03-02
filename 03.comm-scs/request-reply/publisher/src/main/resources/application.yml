@@ -1,0 +1,11 @@
+spring:
+  application:
+    name: Publisher
+  cloud:
+    stream:
+      bindings:
+        responseReceiver-in-0:
+          destination: wordStreamReplyTo
+
+server:
+  port: 8011

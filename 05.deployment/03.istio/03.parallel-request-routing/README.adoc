@@ -1,0 +1,31 @@
+= Istio parallel request routing
+
+Canary deployment was nice. We were able to affect only a small portion of users with new functionality/bugs. We were not able to choose which users those were.
+
+This time we would like to send new functionality only to users that enrolled in our Beta program.
+
+We will simulate this with sending `user-type` request header with value `beta` to our REST API. Istio VirtualService should make a decision on how to route the traffic based on aforementioned header.
+
+[source,shell]
+.Deploy
+----
+kubectl apply -f .
+----
+
+[source,shell]
+.Invoke some regular queries (no Beta), check traffic topology in Kiali
+----
+watch -n 1 "curl -s http://localhost/mice/1 | jq ."
+----
+
+[source,shell]
+.Invoke beta queries, check traffic topology in Kiali
+----
+watch -n 1 "curl -s -H 'user-type: beta' http://localhost/mice/1 | jq ."
+----
+
+[source,shell]
+.Tear down
+----
+kubectl delete -f .
+----

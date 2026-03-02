@@ -1,0 +1,11 @@
+spring:
+  application:
+    name: Subscriber
+  cloud:
+    stream:
+      bindings:
+        process-in-0:
+          destination: wordStreamResults
+
+server:
+  port: 8002

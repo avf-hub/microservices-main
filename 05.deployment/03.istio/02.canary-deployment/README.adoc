@@ -1,0 +1,41 @@
+= Istio Canary Deployment
+
+== Introduction
+
+Our system evolves. Currently it was composed of following services:
+
+* `mouse-catalog`
+* `mouse-reviews`
+
+Developers have created new features. mouse-reviews expose `starRating` for each review, mouse-catalog uses that information to enrich it's response to the caller. Also, mouse-catalog now exposes `dpi` field.
+
+We are unsure if new features do not break the system. We would like to keep the old system running but expose some small percentage of users to new version of the system to minimize potential problems.
+
+When we are sure the new services work we would like to gradually move all traffic to new services and turn off the old ones.
+
+[source,shell]
+.Apply canary deployment
+----
+kubectl apply -f .
+----
+
+[source,shell]
+----
+kubectl get pods
+----
+
+[source,shell]
+.Issue some requests, only a small portion will have new additional fields
+----
+watch -n 1 "curl -s http://localhost/mice/1 | jq ."
+----
+
+TIP: Visualize the topology in Kiali Dashboard
+
+TIP: Change weight distribution, redeploy your app and test again.
+
+[source,shell]
+.Clean up
+----
+kubectl delete -f .
+----

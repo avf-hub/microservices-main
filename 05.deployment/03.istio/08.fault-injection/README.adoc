@@ -1,0 +1,47 @@
+= Fault Injection
+
+In this example we inject random HTTP 500 errors as a response of mouse-reviews
+to test our system.
+
+Check following files:
+
+* istio-mouse-reviews-virtualservice-with-fault-injection.yaml
++
+This configuration is applied for local in-mesh communication.
+Any service requesting mouse-reviews internally will get HTTP 500 with the probability of 50%
+
+* istio-virtualservice.yaml
++
+API Gateway injecting faults into /reviews/* requests.
++
+In this case the response in 60% of cases results in HTTP 555.
+
+[source,shell]
+.deploy app resources
+----
+kubectl apply -f .
+----
+
+[source,shell]
+.send request to mouse-catalog, some of those should show a fallback response (with additional header)
+----
+curl -v http://localhost/mice/1
+----
+
+[source,shell]
+.run multiple requests
+----
+watch -n 3 curl -v http://localhost/mice/1
+----
+
+[source,shell]
+.send requests to mouse-reviews (via API gateway), some calls should give HTTP 555
+----
+watch -n 1 curl -v http://localhost/reviews/10
+----
+
+[source,shell]
+.do not forget to clean up before trying out other examples
+----
+kubectl delete -f .
+----

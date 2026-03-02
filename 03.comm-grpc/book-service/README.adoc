@@ -1,0 +1,10 @@
+= Interacting with gRPC
+
+* Use IntelliJ IDE (sometimes fails)
+* Use Postman
+* Use grpc-client-cli (https://github.com/vadimi/grpc-client-cli)
+
+[source,shell]
+----
+echo '{"count": 10}' | grpc-client-cli -service com.bookstore.BookService -method getBooks localhost:6565
+----

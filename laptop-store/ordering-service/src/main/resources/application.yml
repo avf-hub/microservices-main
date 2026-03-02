@@ -1,0 +1,57 @@
+app:
+  disable-message-publishing: false
+
+# Common configuration
+spring:
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-ordering.xml
+  h2:
+    console:
+      enabled: true
+      settings:
+        web-allow-others: true
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+  datasource:
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: password
+  application:
+    name: ordering-service
+
+---
+spring:
+  config:
+    activate:
+      on-profile: default
+  datasource:
+    url: jdbc:h2:mem:orders
+
+---
+spring:
+  config:
+    activate:
+      on-profile: database-per-service
+  datasource:
+    url: jdbc:h2:~/data/orders;AUTO_SERVER=TRUE
+
+---
+spring:
+  config:
+    activate:
+      on-profile: shared-database
+  datasource:
+    url: jdbc:h2:tcp://h2-server:1521/opt/h2-data/laptop_store
+  h2:
+    console:
+      enabled: false
+---
+spring:
+  config:
+    activate:
+      on-profile: docker-compose
+  cloud:
+    stream:
+      kafka:
+        binder:
+          brokers: kafka-redpanda:9092

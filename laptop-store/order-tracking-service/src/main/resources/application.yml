@@ -1,0 +1,47 @@
+# Common configuration
+server:
+  port: 8088
+spring:
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-order-tracking.xml
+  h2:
+    console:
+      enabled: true
+      settings:
+        web-allow-others: true
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+  datasource:
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: password
+  application:
+    name: order-tracking-service
+
+# Profile-specific configuration
+---
+spring:
+  config:
+    activate:
+      on-profile: default
+  datasource:
+    url: jdbc:h2:mem:order_tracking
+
+---
+spring:
+  config:
+    activate:
+      on-profile: database-per-service
+  datasource:
+    url: jdbc:h2:~/data/order_tracking;AUTO_SERVER=TRUE
+
+---
+spring:
+  config:
+    activate:
+      on-profile: shared-database
+  datasource:
+    url: jdbc:h2:tcp://h2-server:1521/opt/h2-data/laptop_store
+  h2:
+    console:
+      enabled: false

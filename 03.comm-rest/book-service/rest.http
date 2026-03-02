@@ -1,0 +1,8 @@
+### get list
+GET http://localhost:6081/books?limit=1000
+
+### get single with id 1
+GET http://localhost:6081/books/1
+
+### get single  with id 2
+GET http://localhost:6081/books/2

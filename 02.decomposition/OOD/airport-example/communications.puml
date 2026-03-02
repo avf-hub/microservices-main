@@ -1,0 +1,27 @@
+@startuml
+
+actor Client
+
+participant "FlightTimetableService" as FTS
+participant "TicketReservationService" as TRS
+participant "TicketService" as TS
+
+Client -> FTS : buyTicket()
+activate FTS
+FTS -> TRS : check timetable, availability
+activate TRS
+TRS -> TS : reserve ticket
+activate TS
+deactivate TS
+deactivate TRS
+deactivate FTS
+
+Client -> TS : getTicketInformation()
+activate TS
+TS -> FTS : request flight details
+activate FTS
+FTS -> TS : provide delays, cancellation info
+deactivate FTS
+deactivate TS
+
+@enduml

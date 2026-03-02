@@ -1,0 +1,13 @@
+
+GET http://localhost:8031/publish?word=test
+
+###
+GET http://localhost:8031/publish?word=test2
+
+###
+GET http://localhost:8031/publish?word=test3
+
+###
+GET http://localhost:8031/publish?word=test4
+
+
