@@ -6,6 +6,7 @@ import store.laptop.ordering.shared.model.web.dto.OrderStatus;
 import store.laptop.ordertracking.client.OrderingServiceClient;
 import store.laptop.ordertracking.client.PaymentServiceClient;
 import store.laptop.ordertracking.client.ShippingServiceClient;
+import store.laptop.ordertracking.exception.BusinessException;
 import store.laptop.ordertracking.exception.OrderTrackingException;
 import store.laptop.ordertracking.shared.model.web.api.OrderTrackingAPI;
 import store.laptop.ordertracking.shared.model.web.dto.OrderTrackingInfo;
@@ -31,11 +32,12 @@ public class OrderTrackingController implements OrderTrackingAPI {
         try {
             OrderInfo orderInfo = orderingServiceClient
                     .getOrderStatus(orderId);
+            if (orderInfo.getStatus() == OrderStatus.CANCELED) {
+                throw new BusinessException("Order is canceled", orderId);
+            }
 
             PaymentStatus paymentStatus = null;
-            if (orderInfo.getStatus() == OrderStatus.CONFIRMED ||
-                    orderInfo.getStatus() == OrderStatus.CANCELED
-            ) {
+            if (orderInfo.getStatus() == OrderStatus.CONFIRMED) {
                 paymentStatus = paymentServiceClient
                         .getStatusByOrder(orderId);
             }
