@@ -35,4 +35,12 @@ public class BookServiceImpl implements BookService {
 
 		stream.forEach(consumer);
 	}
+
+	@Override
+	public Book createBook(String title, String author) {
+		Book book = new Book();
+		book.setTitle(title);
+		book.setAuthor(author);
+		return bookRepository.save(book);
+	}
 }

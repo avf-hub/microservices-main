@@ -70,4 +70,16 @@ public class GrpcBookService extends BookServiceGrpc.BookServiceImplBase {
 			throw new RuntimeException(e);
 		}
 	}
+
+	@Override
+	public void createBook(BookOuterClass.CreateBookRequest request, StreamObserver<BookOuterClass.CreateBookResponse> responseObserver) {
+		Book savedBook = bookService.createBook(request.getTitle(), request.getAuthor());
+		// Send the response with the ID of the newly created book
+		BookOuterClass.CreateBookResponse response = BookOuterClass.CreateBookResponse.newBuilder()
+				.setId(savedBook.getId())
+				.build();
+
+		responseObserver.onNext(response);
+		responseObserver.onCompleted();
+	}
 }

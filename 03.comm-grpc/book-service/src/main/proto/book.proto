@@ -27,7 +27,17 @@ message BookResponse {
   Book book = 1;
 }
 
+message CreateBookRequest {
+  string title = 1;
+  string author = 2;
+}
+
+message CreateBookResponse {
+  int64 id = 1;
+}
+
 service BookService {
   rpc findById(BookByIdRequest) returns (BookResponse) {};
   rpc getBooks(BookStreamRequest) returns (stream BookResponse) {};
+  rpc createBook(CreateBookRequest) returns (CreateBookResponse) {};
 }

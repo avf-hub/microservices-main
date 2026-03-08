@@ -10,4 +10,6 @@ public interface BookService {
 	Book findById(Long id);
 
 	void iterateBooks(Sort sort, Optional<Long> limit, Consumer<Book> consumer);
+
+	Book createBook(String title, String author);
 }
