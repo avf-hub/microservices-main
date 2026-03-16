@@ -1,5 +1,5 @@
 app:
-  disable-message-publishing: true
+  disable-message-publishing: false
 
 # Common configuration
 spring:

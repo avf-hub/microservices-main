@@ -1,6 +1,7 @@
 package store.laptop.payment.service;
 
 import jakarta.transaction.Transactional;
+import org.springframework.cloud.stream.function.StreamBridge;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import store.laptop.commons.util.DelayedId;
@@ -25,13 +26,16 @@ public class PaymentService {
 	private final DelayQueue<DelayedId> paymentsQueue = new DelayQueue<>();
 
 	private final OrderServiceClient orderServiceClient;
+	private final StreamBridge streamBridge;
 
 	public PaymentService(PaymentRepository paymentRepository,
 	                      AppConfig appConfig,
-	                      OrderServiceClient orderServiceClient) {
+	                      OrderServiceClient orderServiceClient,
+						  StreamBridge streamBridge) {
 		this.paymentRepository = paymentRepository;
 		this.appConfig = appConfig;
 		this.orderServiceClient = orderServiceClient;
+		this.streamBridge = streamBridge;
 	}
 
 	@Transactional
@@ -79,7 +83,12 @@ public class PaymentService {
 			Payment payment = paymentRepository.findById(delayedId.getId()).orElseThrow();
 			payment.setPaymentStatus(PaymentStatus.PAID);
 			paymentRepository.save(payment);
+			startShipment(payment.getOrderId());
 		}
+	}
+
+	public void startShipment(Long orderId) {
+		streamBridge.send("paid-orders", orderId);
 	}
 
 	public PaymentStatus getStatusByOrderId(Long orderId) {

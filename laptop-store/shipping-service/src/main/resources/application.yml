@@ -23,6 +23,12 @@ spring:
     password: password
   application:
     name: shipping-service
+  cloud:
+    stream:
+      bindings:
+        shippingAfterPayment-in-0:
+          destination: paid-orders
+          group: shipping
 
 # Profile-specific configuration
 ---
