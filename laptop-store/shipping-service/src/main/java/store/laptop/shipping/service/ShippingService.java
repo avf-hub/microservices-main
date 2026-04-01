@@ -1,6 +1,7 @@
 package store.laptop.shipping.service;
 
 import jakarta.transaction.Transactional;
+import org.springframework.cloud.stream.function.StreamBridge;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import store.laptop.commons.util.DelayedId;
@@ -19,11 +20,14 @@ public class ShippingService {
 	private final ShippingRepository shippingRepository;
 	private final AppConfig appConfig;
 	private final DelayQueue<DelayedId> shippingQueue = new DelayQueue<>();
+	private final StreamBridge streamBridge;
 
 	public ShippingService(ShippingRepository shippingRepository,
-						   AppConfig appConfig) {
+						   AppConfig appConfig,
+						   StreamBridge streamBridge) {
 		this.shippingRepository = shippingRepository;
 		this.appConfig = appConfig;
+		this.streamBridge = streamBridge;
 	}
 
 	@Transactional
@@ -73,31 +77,37 @@ public class ShippingService {
 	}
 
 	public boolean clearShipping(Long orderId) {
-		Optional<Shipping> shippingOptional = shippingRepository.findByOrderId(orderId);
+		Optional<Shipping> shippingOptional =
+				shippingRepository.findByOrderId(orderId);
 		Shipping shipping;
 		if (shippingOptional.isPresent()) {
 			shipping = shippingOptional.get();
 			if (ShippingStatus.IN_DELIVERY == shipping.getShippingStatus()) {
+				cancelShipping(orderId);
 				shippingRepository.delete(shipping);
 				return true;
 			} else if (ShippingStatus.DELIVERED == shipping.getShippingStatus()) {
 				throw new ShippingValidationException(
-					"Order is already delivered",
-					shipping.getId()
+						"Заказ уже был доставлен",
+						shipping.getId()
 				);
 			} else if (ShippingStatus.UNKNOWN == shipping.getShippingStatus()) {
 				throw new ShippingValidationException(
-					"Order is not in process of delivery",
-					shipping.getId()
+						"Заказ не находится в процессе доставки",
+						shipping.getId()
 				);
 			}
 		} else {
 			throw new ShippingValidationException(
-					"Shipping for Order is not found",
+					"Информация о доставке для заказа не найдена",
 					orderId
 			);
 		}
 		return false;
+	}
+
+	private void cancelShipping(Long orderId) {
+		streamBridge.send("cancelled-orders", orderId);
 	}
 
 	private Shipping noShipping() {

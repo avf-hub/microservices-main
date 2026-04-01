@@ -28,4 +28,16 @@
             <column name="cost" type="numeric"/>
         </createTable>
     </changeSet>
+    <changeSet id="create-outbox_messages-table" author="falkovskiy-av">
+        <createTable tableName="outbox_messages">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true"
+                             nullable="false"
+                             unique="true"/>
+            </column>
+            <column name="message" type="varchar(300)"/>
+            <column name="sent" type="boolean"/>
+            <column name="date" type="datetime"/>
+        </createTable>
+    </changeSet>
 </databaseChangeLog>

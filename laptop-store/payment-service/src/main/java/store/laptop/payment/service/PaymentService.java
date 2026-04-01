@@ -2,6 +2,7 @@ package store.laptop.payment.service;
 
 import jakarta.transaction.Transactional;
 import org.springframework.cloud.stream.function.StreamBridge;
+import org.springframework.context.annotation.Bean;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import store.laptop.commons.util.DelayedId;
@@ -18,6 +19,7 @@ import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.concurrent.DelayQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 @Service
 public class PaymentService {
@@ -114,5 +116,31 @@ public class PaymentService {
 			throw new PaymentProcessingException("Payment was not found",
 				paymentId, ex);
 		}
+	}
+
+	@Bean
+	public Consumer<Long> revertPayment() {
+		return orderId -> {
+			Optional<Payment> paymentOptional =
+					paymentRepository.findByOrderId(orderId);
+			Payment payment;
+			if (paymentOptional.isPresent()) {
+				payment = paymentOptional.get();
+				if (PaymentStatus.IN_PROCESS == payment.getPaymentStatus()) {
+					payment.setPaymentStatus(PaymentStatus.CANCELLED);
+					paymentRepository.save(payment);
+				} else if (PaymentStatus.PAID == payment.getPaymentStatus()) {
+					payment.setPaymentStatus(PaymentStatus.CANCELLED);
+					paymentRepository.save(payment);
+					moneyBack(payment);
+				}
+			}
+		};
+	}
+
+	public void moneyBack(Payment payment) {
+		System.out.println("Возврат средств за оплату "+payment.getId()+
+				" клиенту "+payment.getCustomerId()+": "+
+				"$"+payment.getPaymentCost()+" компенсировано");
 	}
 }
